@@ -20,7 +20,7 @@ func Attach(iface int) (link.Link, error) {
 	if err := loadBwfilterObjects(&objs, nil); err != nil {
 		log.Fatalf("loading objects: %s", err)
 	}
-	defer objs.Close()
+	// defer objs.Close()
 
 	tcnl, err := tc.Open(&tc.Config{})
 	if err != nil {
@@ -60,6 +60,7 @@ func Attach(iface int) (link.Link, error) {
 
 		fd := uint32(objs.TcProg.FD())
 		flags := uint32(tc.BpfActDirect)
+		name := "bwfilter"
 		filter := tc.Object{
 			Msg: tc.Msg{
 				Family:  unix.AF_UNSPEC,
@@ -73,6 +74,7 @@ func Attach(iface int) (link.Link, error) {
 				BPF: &tc.Bpf{
 					FD:    &fd,
 					Flags: &flags,
+					Name:  &name,
 				},
 			},
 		}

@@ -45,11 +45,21 @@ static inline uint32_t get_flow_key(struct __sk_buff *skb) {
 }
 
 static inline int throttle_flow(struct __sk_buff *skb) {
-  int key = get_flow_key(skb);
+  int key = 0;
   uint64_t *last_tstamp = bpf_map_lookup_elem(&flow_map, &key);
-  uint64_t delay_ns = ((uint64_t)skb->len) * NS_PER_SEC / THROTTLE_RATE_BPS;
+  uint64_t delay_ns =
+      ((uint64_t)skb->wire_len) * NS_PER_SEC / THROTTLE_RATE_BPS;
   uint64_t now = bpf_ktime_get_ns();
-  uint64_t tstamp = now, next_tstamp = 0;
+  uint64_t tstamp, next_tstamp = 0;
+
+#if 0
+  tstamp = skb->tstamp;
+  if (tstamp < now) {
+    tstamp = now;
+  }
+#else
+  tstamp = now;
+#endif
 
   if (last_tstamp) {
     next_tstamp = *last_tstamp + delay_ns;
