@@ -3,11 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 
 	"github.com/BurntSushi/toml"
-	"github.com/charmbracelet/log"
 
 	"github.com/brian14708/wg-gatekeeper/bwfilter"
 	"github.com/brian14708/wg-gatekeeper/wireguard"
@@ -35,24 +35,24 @@ func main() {
 
 	var cfg Config
 	if _, err := toml.DecodeFile(*flagConfigPath, &cfg); err != nil {
-		log.Fatal("parsing config", "err", err)
+		log.Fatalf("parsing config: %v", err)
 	}
 
 	wg, err := wireguard.New(cfg.Interface.Name, cfg.Interface.PrivateKey, cfg.Interface.ListenPort)
 	if err != nil {
-		log.Fatal("setting up interface", "err", err)
+		log.Fatalf("setting up interface: %v", err)
 	}
 	defer wg.Close()
 
 	for _, address := range cfg.Interface.Subnets {
 		if err := wg.AddrAdd(address); err != nil {
-			log.Fatal("adding subnet", "subnet", address, "err", err)
+			log.Fatalf("adding subnet (%v): %v", address, err)
 		}
 	}
 
 	for _, peer := range cfg.Peers {
 		if err := wg.PeerAdd(peer.PublicKey, peer.IP); err != nil {
-			log.Fatal("adding peer", "peer", peer.PublicKey, "err", err)
+			log.Fatalf("adding peer (%v): %v", peer.PublicKey, err)
 		}
 	}
 
@@ -60,19 +60,19 @@ func main() {
 
 	_, err = bwfilter.Attach(wg.LinkIndex())
 	if err != nil {
-		log.Fatal("attaching filter", "err", err)
+		log.Fatalf("attaching filter: %v", err)
 	}
 	// defer l.Close()
 
 	if err := wg.LinkUp(); err != nil {
-		log.Fatal("link up", "err", err)
+		log.Fatalf("link up: %v", err)
 	}
 
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, os.Interrupt)
-	log.Info("RUNNING...")
+	log.Print("RUNNING...")
 	<-ch
 
-	log.Info("SHUTTING DOWN...")
+	log.Print("SHUTTING DOWN...")
 	signal.Reset(os.Interrupt)
 }
