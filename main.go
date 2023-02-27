@@ -23,8 +23,9 @@ type Config struct {
 		ListenPort int
 		PrivateKey string
 		Subnets    []string
+		NatForward string
 	}
-	Peers []struct {
+	Clients []struct {
 		IP        string
 		PublicKey string
 	}
@@ -50,9 +51,15 @@ func main() {
 		}
 	}
 
-	for _, peer := range cfg.Peers {
+	for _, peer := range cfg.Clients {
 		if err := wg.PeerAdd(peer.PublicKey, peer.IP); err != nil {
 			log.Fatalf("adding peer (%v): %v", peer.PublicKey, err)
+		}
+	}
+
+	if cfg.Interface.NatForward != "" {
+		if err := wg.NatAdd(cfg.Interface.NatForward); err != nil {
+			log.Fatalf("adding nat (%v): %v", cfg.Interface.NatForward, err)
 		}
 	}
 

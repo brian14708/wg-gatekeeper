@@ -3,7 +3,10 @@ package wireguard
 import (
 	"errors"
 	"net"
+	"os"
 
+	"github.com/coreos/go-iptables/iptables"
+	"github.com/lorenzosaino/go-sysctl"
 	"github.com/vishvananda/netlink"
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -20,22 +23,26 @@ func New(name string, privateKey string, listenPort int) (_ *Interface, outErr e
 		name: name,
 	}
 
-	attr := netlink.NewLinkAttrs()
-	attr.Name = name
-	i.link = &netlink.GenericLink{
-		LinkAttrs: attr,
-		LinkType:  "wireguard",
-	}
-
-	// setup link
-	if err := netlink.LinkAdd(i.link); err != nil {
-		return nil, err
-	}
-	defer func() {
-		if outErr != nil {
-			netlink.LinkDel(i.link)
+	if link, err := netlink.LinkByName(name); err == nil {
+		i.link = link
+	} else {
+		attr := netlink.NewLinkAttrs()
+		attr.Name = name
+		i.link = &netlink.GenericLink{
+			LinkAttrs: attr,
+			LinkType:  "wireguard",
 		}
-	}()
+
+		// setup link
+		if err := netlink.LinkAdd(i.link); err != nil {
+			return nil, err
+		}
+		defer func() {
+			if outErr != nil {
+				netlink.LinkDel(i.link)
+			}
+		}()
+	}
 
 	// setup qdisc
 	fq := &netlink.Fq{
@@ -83,12 +90,16 @@ func (i *Interface) AddrAdd(a string) error {
 	if err != nil {
 		return err
 	}
-	return netlink.AddrAdd(i.link, &netlink.Addr{
+	err = netlink.AddrAdd(i.link, &netlink.Addr{
 		IPNet: &net.IPNet{
 			IP:   ip,
 			Mask: ipnet.Mask,
 		},
 	})
+	if err == nil || errors.Is(err, os.ErrExist) {
+		return nil
+	}
+	return err
 }
 
 func (i *Interface) LinkUp() error {
@@ -139,8 +150,37 @@ func (i *Interface) PeerRemove(publicKey string) error {
 }
 
 func (i *Interface) Close() error {
-	return errors.Join(
-		netlink.LinkDel(i.link),
-		i.client.Close(),
-	)
+	return i.client.Close()
+}
+
+func (i *Interface) Delete() error {
+	return netlink.LinkDel(i.link)
+}
+
+func (i *Interface) NatAdd(iface string) error {
+	if val, err := sysctl.Get("net.ipv4.ip_forward"); err != nil {
+		return err
+	} else if val != "1" {
+		if err := sysctl.Set("net.ipv4.ip_forward", "1"); err != nil {
+			return err
+		}
+	}
+
+	tbl, err := iptables.New()
+	if err != nil {
+		return err
+	}
+	err = tbl.AppendUnique("filter", "FORWARD", "-i", i.name, "-j", "ACCEPT")
+	if err != nil {
+		return err
+	}
+	err = tbl.AppendUnique("filter", "FORWARD", "-o", i.name, "-i", iface, "-j", "ACCEPT")
+	if err != nil {
+		return err
+	}
+	err = tbl.AppendUnique("nat", "POSTROUTING", "-o", iface, "-j", "MASQUERADE")
+	if err != nil {
+		return err
+	}
+	return nil
 }

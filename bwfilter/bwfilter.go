@@ -2,6 +2,7 @@ package bwfilter
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -15,7 +16,6 @@ import (
 )
 
 func Attach(iface int) (link.Link, error) {
-	// Load pre-compiled programs into the kernel.
 	objs := bwfilterObjects{}
 	if err := loadBwfilterObjects(&objs, nil); err != nil {
 		log.Fatalf("loading objects: %s", err)
@@ -46,6 +46,9 @@ func Attach(iface int) (link.Link, error) {
 		},
 	}
 
+	if err := tcnl.Qdisc().Delete(&qdisc); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
 	if err := tcnl.Qdisc().Add(&qdisc); err != nil {
 		fmt.Fprintf(os.Stderr, "could not assign clsact to %d: %v\n", iface, err)
 		return nil, err
