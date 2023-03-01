@@ -11,11 +11,18 @@ require (
 	github.com/vishvananda/netlink v1.2.1-beta.2.0.20220608195807-1a118fe229fc
 	golang.org/x/sys v0.5.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20230215201556-9c5414ab4bde
+	gorm.io/datatypes v1.1.0
+	gorm.io/driver/sqlite v1.4.4
+	gorm.io/gorm v1.24.5
 )
 
 require (
+	github.com/go-sql-driver/mysql v1.7.0 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
+	github.com/jinzhu/inflection v1.0.0 // indirect
+	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/josharian/native v1.1.0 // indirect
+	github.com/mattn/go-sqlite3 v1.14.15 // indirect
 	github.com/mdlayher/genetlink v1.3.1 // indirect
 	github.com/mdlayher/netlink v1.7.1 // indirect
 	github.com/mdlayher/socket v0.4.0 // indirect
@@ -28,5 +35,6 @@ require (
 	golang.org/x/sync v0.1.0 // indirect
 	golang.org/x/tools v0.1.11 // indirect
 	golang.zx2c4.com/wireguard v0.0.0-20230223181233-21636207a675 // indirect
+	gorm.io/driver/mysql v1.4.4 // indirect
 	honnef.co/go/tools v0.3.2 // indirect
 )

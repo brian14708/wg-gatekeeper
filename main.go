@@ -8,13 +8,17 @@ import (
 	"os/signal"
 
 	"github.com/BurntSushi/toml"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 
 	"github.com/brian14708/wg-gatekeeper/bwfilter"
+	"github.com/brian14708/wg-gatekeeper/models"
 	"github.com/brian14708/wg-gatekeeper/wireguard"
 )
 
 var (
 	flagConfigPath = flag.String("config", "config.toml", "path to config file")
+	flagDbPath     = flag.String("db", "wireguard.db", "path to database")
 )
 
 type Config struct {
@@ -33,6 +37,14 @@ type Config struct {
 
 func main() {
 	flag.Parse()
+
+	db, err := gorm.Open(sqlite.Open(*flagDbPath), &gorm.Config{})
+	if err != nil {
+		panic("failed to connect database")
+	}
+
+	models.AutoMigrate(db)
+	return
 
 	var cfg Config
 	if _, err := toml.DecodeFile(*flagConfigPath, &cfg); err != nil {
