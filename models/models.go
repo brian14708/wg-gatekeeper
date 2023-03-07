@@ -2,7 +2,12 @@ package models
 
 import "gorm.io/gorm"
 
-func AutoMigrate(db *gorm.DB) {
+var (
+	DB *gorm.DB
+)
+
+func Init(db *gorm.DB) {
+	DB = db
 	db.AutoMigrate(
 		&Interface{},
 	)
