@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net"
 	"os"
+	"strings"
 
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/lorenzosaino/go-sysctl"
@@ -16,9 +17,11 @@ type Interface struct {
 	name   string
 	client *wgctrl.Client
 	link   netlink.Link
+
+	prevPeer map[wgtypes.Key]string
 }
 
-func New(name string, privateKey string, listenPort int) (_ *Interface, outErr error) {
+func New(name string, privateKey []byte, listenPort int) (_ *Interface, outErr error) {
 	i := &Interface{
 		name: name,
 	}
@@ -69,7 +72,7 @@ func New(name string, privateKey string, listenPort int) (_ *Interface, outErr e
 	}()
 
 	// configure wg interface
-	key, err := wgtypes.ParseKey(privateKey)
+	key, err := wgtypes.NewKey(privateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -89,6 +92,15 @@ func (i *Interface) AddrAdd(a string) error {
 	ip, ipnet, err := net.ParseCIDR(a)
 	if err != nil {
 		return err
+	}
+	addrs, err := netlink.AddrList(i.link, netlink.FAMILY_V4)
+	if err != nil {
+		return err
+	}
+	for _, addr := range addrs {
+		if err := netlink.AddrDel(i.link, &addr); err != nil {
+			return err
+		}
 	}
 	err = netlink.AddrAdd(i.link, &netlink.Addr{
 		IPNet: &net.IPNet{
@@ -110,42 +122,59 @@ func (i *Interface) LinkIndex() int {
 	return i.link.Attrs().Index
 }
 
-func (i *Interface) PeerAdd(publicKey string, ip string) error {
-	key, err := wgtypes.ParseKey(publicKey)
-	if err != nil {
-		return err
+func (i *Interface) PeerSync(peers map[wgtypes.Key]string) error {
+	if i.prevPeer == nil {
+		dev, err := i.client.Device(i.name)
+		if err != nil {
+			return err
+		}
+		i.prevPeer = make(map[wgtypes.Key]string)
+		for _, p := range dev.Peers {
+			i.prevPeer[p.PublicKey] = p.AllowedIPs[0].IP.String()
+		}
 	}
-	addr := net.ParseIP(ip)
-	mask := net.CIDRMask(32, 32)
+
+	toDelete := make(map[wgtypes.Key]struct{})
+	toAdd := make(map[wgtypes.Key]net.IP)
+	for k, p := range i.prevPeer {
+		if ip, ok := peers[k]; !ok {
+			toDelete[k] = struct{}{}
+		} else {
+			if p != ip {
+				toAdd[k] = net.ParseIP(ip)
+			}
+		}
+	}
+	for k := range peers {
+		_, found := i.prevPeer[k]
+		if !found {
+			toAdd[k] = net.ParseIP(peers[k])
+		}
+	}
+
 	wgcfg := wgtypes.Config{
-		Peers: []wgtypes.PeerConfig{
-			{
-				PublicKey: key,
-				AllowedIPs: []net.IPNet{
-					{
-						IP:   addr,
-						Mask: mask,
-					},
+		Peers: []wgtypes.PeerConfig{},
+	}
+	for k := range toDelete {
+		wgcfg.Peers = append(wgcfg.Peers, wgtypes.PeerConfig{
+			PublicKey: k,
+			Remove:    true,
+		})
+	}
+	for k, ip := range toAdd {
+		mask := net.CIDRMask(32, 32)
+		wgcfg.Peers = append(wgcfg.Peers, wgtypes.PeerConfig{
+			PublicKey: k,
+			AllowedIPs: []net.IPNet{
+				{
+					IP:   ip,
+					Mask: mask,
 				},
 			},
-		},
+		})
 	}
-	return i.client.ConfigureDevice(i.name, wgcfg)
-}
 
-func (i *Interface) PeerRemove(publicKey string) error {
-	key, err := wgtypes.ParseKey(publicKey)
-	if err != nil {
-		return err
-	}
-	wgcfg := wgtypes.Config{
-		Peers: []wgtypes.PeerConfig{
-			{
-				PublicKey: key,
-				Remove:    true,
-			},
-		},
-	}
+	i.prevPeer = peers
 	return i.client.ConfigureDevice(i.name, wgcfg)
 }
 
@@ -170,15 +199,41 @@ func (i *Interface) NatAdd(iface string) error {
 	if err != nil {
 		return err
 	}
-	err = tbl.AppendUnique("filter", "FORWARD", "-i", i.name, "-j", "ACCEPT")
+	rules, err := tbl.List("filter", "FORWARD")
 	if err != nil {
 		return err
 	}
-	err = tbl.AppendUnique("filter", "FORWARD", "-o", i.name, "-i", iface, "-j", "ACCEPT")
+	for _, rule := range rules {
+		if strings.Contains(rule, "wg-gatekeeper") {
+			if err := tbl.Delete("filter", "FORWARD", strings.Split(strings.TrimPrefix(rule, "-A FORWARD "), " ")...); err != nil {
+				return err
+			}
+		}
+	}
+	rules, err = tbl.List("nat", "POSTROUTING")
 	if err != nil {
 		return err
 	}
-	err = tbl.AppendUnique("nat", "POSTROUTING", "-o", iface, "-j", "MASQUERADE")
+	for _, rule := range rules {
+		if strings.Contains(rule, "wg-gatekeeper") {
+			if err := tbl.Delete("nat", "POSTROUTING", strings.Split(strings.TrimPrefix(rule, "-A POSTROUTING "), " ")...); err != nil {
+				return err
+			}
+		}
+	}
+	if iface == "" {
+		return nil
+	}
+
+	err = tbl.AppendUnique("filter", "FORWARD", "-i", i.name, "-j", "ACCEPT", "-m", "comment", "--comment", "wg-gatekeeper")
+	if err != nil {
+		return err
+	}
+	err = tbl.AppendUnique("filter", "FORWARD", "-o", i.name, "-i", iface, "-j", "ACCEPT", "-m", "comment", "--comment", "wg-gatekeeper")
+	if err != nil {
+		return err
+	}
+	err = tbl.AppendUnique("nat", "POSTROUTING", "-o", iface, "-j", "MASQUERADE", "-m", "comment", "--comment", "wg-gatekeeper")
 	if err != nil {
 		return err
 	}

@@ -98,6 +98,7 @@ func appHandler(app *fiber.App) {
 		} else {
 			flashInfo(c, "Account updated")
 		}
+		syncer.UpdateAccounts()
 		return c.Redirect("/account/" + c.Params("id"))
 	})
 
@@ -109,6 +110,7 @@ func appHandler(app *fiber.App) {
 		} else {
 			flashInfo(c, "Account deleted")
 		}
+		syncer.UpdateAccounts()
 		return c.Redirect("/")
 	})
 
@@ -154,6 +156,7 @@ func appHandler(app *fiber.App) {
 		ips.RemoveNet(mustCIDR("172.16.0.0/12"))
 		ips.RemoveNet(mustCIDR("192.168.0.0/16"))
 		ips.RemoveNet(mustCIDR("224.0.0.0/4"))
+		ips.RemoveNet(mustCIDR(iface.ExternalIP + "/32"))
 		cidrStr := strings.Join(ips.String(), ",")
 
 		config := fmt.Sprintf(`[Interface]
@@ -175,6 +178,7 @@ AllowedIPs = %s`,
 			flashError(c, ret.Error.Error())
 			return c.Redirect("/account/" + c.Params("id"))
 		}
+		syncer.UpdateClients()
 		return c.Render("client", fiber.Map{
 			"Client":    cli,
 			"AccountID": c.Params("id"),
@@ -186,6 +190,7 @@ AllowedIPs = %s`,
 	app.Get("/account/:id/client/:cid/delete", func(c *fiber.Ctx) error {
 		var cli models.Client
 		models.DB.Unscoped().Delete(&cli, c.Params("cid"))
+		syncer.UpdateClients()
 		return c.Redirect("/account/" + c.Params("id"))
 	})
 
@@ -253,6 +258,7 @@ AllowedIPs = %s`,
 			return c.Redirect("/interface")
 		} else {
 			flashInfo(c, "Interface updated")
+			syncer.UpdateInterface()
 			return c.Redirect("/")
 		}
 	})

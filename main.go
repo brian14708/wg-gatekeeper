@@ -19,6 +19,9 @@ import (
 
 var (
 	flagDBPath = flag.String("db", "db.sqlite", "path to database")
+	flagListen = flag.String("listen", ":3000", "address to listen on")
+
+	syncer *Syncer
 )
 
 func main() {
@@ -29,6 +32,9 @@ func main() {
 		panic("failed to connect database")
 	}
 	models.Init(db)
+
+	syncer = NewSyncer()
+	syncer.UpdateInterface()
 
 	vfs := GetViews()
 	engine := html.NewFileSystem(http.FS(vfs), ".html")
@@ -95,47 +101,12 @@ func main() {
 
 	appHandler(app)
 
-	app.Listen(":3000")
-
-	// var cfg Config
-	// if _, err := toml.DecodeFile(*flagConfigPath, &cfg); err != nil {
-	// 	log.Fatalf("parsing config: %v", err)
-	// }
-
-	// wg, err := wireguard.New(cfg.Interface.Name, cfg.Interface.PrivateKey, cfg.Interface.ListenPort)
-	// if err != nil {
-	// 	log.Fatalf("setting up interface: %v", err)
-	// }
-	// defer wg.Close()
-
-	// for _, address := range cfg.Interface.Subnets {
-	// 	if err := wg.AddrAdd(address); err != nil {
-	// 		log.Fatalf("adding subnet (%v): %v", address, err)
-	// 	}
-	// }
-
-	// for _, peer := range cfg.Clients {
-	// 	if err := wg.PeerAdd(peer.PublicKey, peer.IP); err != nil {
-	// 		log.Fatalf("adding peer (%v): %v", peer.PublicKey, err)
-	// 	}
-	// }
-
-	// if cfg.Interface.NatForward != "" {
-	// 	if err := wg.NatAdd(cfg.Interface.NatForward); err != nil {
-	// 		log.Fatalf("adding nat (%v): %v", cfg.Interface.NatForward, err)
-	// 	}
-	// }
-
-	// fmt.Println(wg.LinkIndex())
+	app.Listen(*flagListen)
 
 	// _, err = bwfilter.Attach(wg.LinkIndex())
 	// if err != nil {
 	// 	log.Fatalf("attaching filter: %v", err)
 	// }
 	// // defer l.Close()
-
-	// if err := wg.LinkUp(); err != nil {
-	// 	log.Fatalf("link up: %v", err)
-	// }
 
 }

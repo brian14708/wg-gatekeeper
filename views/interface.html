@@ -2,13 +2,17 @@
 
 <form action="/interface" method="post">
     <label for="name">Interface name</label>
-    <input type="text" name="name" id="name" required value="{{ default `wg0` .Iface.Name }}">
+    {{ if .Iface.Name }}
+    <input type="text" name="name" id="name" required value="{{ .Iface.Name }}" readonly>
+    {{ else }}
+    <input type="text" name="name" id="name" required value="wg0">
+    {{ end }}
     <label for="listen_port">Listen port</label>
     <input type="number" name="listen_port" id="listen_port" required min="1" max="65535"
         value="{{ default 51820 .Iface.ListenPort }}">
     <label for="nat_iface">NAT forward interface</label>
     <select name="nat_iface" id="nat_iface">
-        <option>-</option>
+        <option value="">-</option>
         {{ range .Links }}
         <option value="{{.Name}}" {{ if eq .Name $.Iface.NatIface }}selected{{ end }}>{{.Name}}</option>
         {{ end }}
