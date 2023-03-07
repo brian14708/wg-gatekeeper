@@ -1,18 +1,20 @@
 package main
 
 import (
+	"bytes"
+	"encoding/base64"
 	"fmt"
 	"net"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/brian14708/wg-gatekeeper/models"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/vishvananda/netlink"
+	"github.com/yeqown/go-qrcode/v2"
+	"github.com/yeqown/go-qrcode/writer/standard"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
-	"gopkg.in/netaddr.v1"
 	"gorm.io/gorm"
 )
 
@@ -149,40 +151,46 @@ func appHandler(app *fiber.App) {
 			cli.IPAddress = ip.String()
 		}
 
-		var ips netaddr.IPSet
-		ips.InsertNet(mustCIDR("0.0.0.0/0"))
-		ips.RemoveNet(mustCIDR("10.0.0.0/8"))
-		ips.RemoveNet(mustCIDR("127.0.0.0/8"))
-		ips.RemoveNet(mustCIDR("172.16.0.0/12"))
-		ips.RemoveNet(mustCIDR("192.168.0.0/16"))
-		ips.RemoveNet(mustCIDR("224.0.0.0/4"))
-		ips.RemoveNet(mustCIDR(iface.ExternalIP + "/32"))
-		cidrStr := strings.Join(ips.String(), ",")
-
+		ikey, err := wgtypes.NewKey(iface.PrivateKey)
+		if err != nil {
+			panic(err)
+		}
 		config := fmt.Sprintf(`[Interface]
 Address = %s
 PrivateKey = %s
 [Peer]
 PublicKey = %s
 Endpoint = %s:%d
-AllowedIPs = %s`,
+AllowedIPs = 0.0.0.0/0`,
 			cli.IPAddress,
 			key.String(),
-			wgtypes.Key(iface.PrivateKey).PublicKey().String(),
+			ikey.PublicKey().String(),
 			iface.ExternalIP,
 			iface.ListenPort,
-			cidrStr,
 		)
 		ret := models.DB.Create(&cli)
 		if ret.Error != nil {
 			flashError(c, ret.Error.Error())
 			return c.Redirect("/account/" + c.Params("id"))
 		}
+
+		qrc, err := qrcode.NewWith(config, qrcode.WithErrorCorrectionLevel(qrcode.ErrorCorrectionLow))
+		if err != nil {
+			panic(err)
+		}
+
+		var buf bytes.Buffer
+		w := standard.NewWithWriter(base64.NewEncoder(base64.StdEncoding, &buf), standard.WithQRWidth(8))
+		if err = qrc.Save(w); err != nil {
+			fmt.Printf("could not save image: %v", err)
+		}
+
 		syncer.UpdateClients()
 		return c.Render("client", fiber.Map{
 			"Client":    cli,
 			"AccountID": c.Params("id"),
 			"Config":    config,
+			"QRCode":    buf.String(),
 		})
 	})
 
@@ -282,14 +290,6 @@ func flashInfo(c *fiber.Ctx, msg string) {
 		HTTPOnly:    true,
 		SessionOnly: true,
 	})
-}
-
-func mustCIDR(s string) *net.IPNet {
-	_, cidr, err := net.ParseCIDR(s)
-	if err != nil {
-		panic(err)
-	}
-	return cidr
 }
 
 func nextIP(ip net.IP, cidr *net.IPNet) (net.IP, error) {
