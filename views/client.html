@@ -1,0 +1,7 @@
+<h2>Wireguard Config</h2>
+<a href="data:text/plain;base64,{{.Config|b64enc}}" download="wg0.conf">Download configuration</a>
+
+<pre><code>{{.Config}}</code></pre>
+
+
+<a href="/account/{{ .AccountID }}">Back</a>

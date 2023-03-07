@@ -1,17 +1,34 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WireGuard Gatekeeper - {{ .Title }}</title>
-    <link rel="icon" type="image/png" href="/assets/shield.png">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.min.css">
-  </head>
-  <body>
-    <main>
-      <h1>🛡️ {{ .Title }}</h1>
-      <hr>
-      {{embed}}
-    </main>
-  </body>
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gatekeeper</title>
+  <link rel="icon" type="image/png" href="/assets/shield.png">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.min.css">
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+
+<body>
+  <header id="header">
+    <h1>
+      <a class="link-button" href="/">🛡️</a> Gatekeeper
+    </h1>
+    <a href="/interface"><button>⚙️</button></a>
+  </header>
+
+  {{ if .FlashInfo }}
+  <p class="flash-info">{{.FlashInfo}}</p>
+  {{ end }}
+  {{ if .FlashError }}
+  <p class="flash-error">{{.FlashError}}</p>
+  {{ end }}
+
+
+  <main>
+    {{embed}}
+  </main>
+</body>
+
 </html>

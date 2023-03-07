@@ -1,0 +1,32 @@
+#header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 2em;
+    padding-bottom: 1em;
+    margin-bottom: 2em;
+    border-bottom: 1px solid var(--border);
+}
+
+#header h1 {
+    margin: 0;
+}
+
+#header button {
+    margin: 0;
+}
+
+.link-button:hover {
+    text-decoration: none;
+}
+
+.flash-info {
+    background-color: rgba(0, 150, 191, 0.3);
+    padding: 1em 1em;
+}
+
+.flash-error {
+    background-color: rgba(191, 0, 0, 0.3);
+    padding: 1em 1em;
+}

@@ -1,0 +1,22 @@
+<h2>Settings</h2>
+
+<form action="/interface" method="post">
+    <label for="name">Interface name</label>
+    <input type="text" name="name" id="name" required value="{{ default `wg0` .Iface.Name }}">
+    <label for="listen_port">Listen port</label>
+    <input type="number" name="listen_port" id="listen_port" required min="1" max="65535"
+        value="{{ default 51820 .Iface.ListenPort }}">
+    <label for="nat_iface">NAT forward interface</label>
+    <select name="nat_iface" id="nat_iface">
+        <option>-</option>
+        {{ range .Links }}
+        <option value="{{.Name}}" {{ if eq .Name $.Iface.NatIface }}selected{{ end }}>{{.Name}}</option>
+        {{ end }}
+    </select>
+    <label for="subnet">Subnet</label>
+    <input type="text" name="subnet" id="subnet" required value="{{ default `192.168.5.1/24` .Iface.Subnet }}">
+    <label for="external_ip">External IP</label>
+    <input type="text" name="external_ip" id="external_ip" required value="{{ default .GuessIP .Iface.ExternalIP }}">
+
+    <input type="submit" value="Save">
+</form>

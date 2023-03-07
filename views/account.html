@@ -1,0 +1,41 @@
+<h2>👤 {{ .Account.Name }}</h2>
+
+<h3>
+    Clients
+    <a href="#" onclick="document.getElementById('create-client').showModal();return false">[+]</a>
+</h3>
+
+<table>
+    <tr>
+        <th>Name</th>
+        <th>IP</th>
+        <th></th>
+    </tr>
+    {{ range .Account.Clients }}
+    <tr>
+        <td>{{ .Name }}</td>
+        <td>{{ .IPAddress }}</td>
+        <td><a href="/account/{{ $.Account.ID }}/client/{{ .ID }}/delete">Delete</a></td>
+    </tr>
+    {{ end }}
+</table>
+
+<h3>
+    Settings
+</h3>
+
+<form action="/account/{{ .Account.ID }}" method="post">
+    <label for="bandwidth_limit">Bandwidth limit (MB/s)</label>
+    <input type="number" name="bandwidth_limit" step=".01" id="bandwidth_limit" required
+        value="{{ round (divf .Account.BandwidthLimit 1048576.0) 2 }}">
+    <input type="submit" value="Update">
+</form>
+
+<dialog id="create-client" onclick="event.target==this && this.close()">
+    <header>Create new client</header>
+    <form action="/account/{{ $.Account.ID }}/client" method="post">
+        <label for="name">Client name</label>
+        <input type="text" name="name" id="name" required>
+        <input type="submit" value="Create">
+    </form>
+</dialog>

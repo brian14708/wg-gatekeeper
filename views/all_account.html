@@ -1,0 +1,27 @@
+<h2>All Accounts <a href="#" onclick="document.getElementById('create-account').showModal();return false">[+]</a></h2>
+
+<table>
+    <tr>
+        <th>Name</th>
+        <th># of clients</th>
+        <th></th>
+    </tr>
+    {{ range .Accounts }}
+    <tr>
+        <td><a href="/account/{{ .ID }}">{{ .Name }}</a></td>
+        <td>{{ .Clients }}</td>
+        <td><a href="/account/{{ .ID }}/delete">Delete</a></td>
+    </tr>
+    {{ end }}
+</table>
+
+<dialog id="create-account" onclick="event.target==this && this.close()">
+    <header>Create new account</header>
+    <form action="/account" method="post">
+        <label for="name">Account name</label>
+        <input type="text" name="name" id="name" required>
+        <label for="bandwidth_limit">Bandwidth limit (MB/s)</label>
+        <input type="number" name="bandwidth_limit" id="bandwidth_limit" step=".01" required>
+        <input type="submit" value="Create">
+    </form>
+</dialog>

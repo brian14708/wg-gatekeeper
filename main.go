@@ -2,8 +2,12 @@ package main
 
 import (
 	"flag"
+	"math/rand"
 	"net/http"
+	"strconv"
+	"time"
 
+	"github.com/Masterminds/sprig/v3"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
 	"github.com/gofiber/template/html"
@@ -14,24 +18,22 @@ import (
 )
 
 var (
-	flagConfigPath = flag.String("config", "config.toml", "path to config file")
-	flagDBPath     = flag.String("db", "wireguard.db", "path to database")
+	flagDBPath = flag.String("db", "db.sqlite", "path to database")
 )
 
 func main() {
 	flag.Parse()
 
-	db, err := gorm.Open(sqlite.Open(*flagDBPath), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(*flagDBPath+"?_foreign_keys=on"), &gorm.Config{})
 	if err != nil {
 		panic("failed to connect database")
 	}
 	models.Init(db)
 
-	vfs, reload := GetViews()
+	vfs := GetViews()
 	engine := html.NewFileSystem(http.FS(vfs), ".html")
-	if reload {
-		engine.Reload(true)
-	}
+	engine.AddFuncMap(sprig.FuncMap())
+	engine.Reload(Debug)
 
 	app := fiber.New(fiber.Config{
 		Views:       engine,
@@ -42,15 +44,58 @@ func main() {
 		Root: http.FS(GetAssets()),
 	}))
 
-	app.Get("/", func(c *fiber.Ctx) error {
-		return c.Render("index", fiber.Map{
-			"Title": "Interfaces",
-		})
+	instanceKey := strconv.Itoa(rand.Int())
+	app.Use(func(c *fiber.Ctx) error {
+		if c.Cookies("iface") != instanceKey {
+			var cnt int64
+			models.DB.Model(&models.Interface{}).Count(&cnt)
+			if cnt == 0 {
+				if c.Path() != "/interface" {
+					flashInfo(c, "Please setup interface first")
+					return c.Redirect("/interface")
+				}
+			} else {
+				c.Cookie(&fiber.Cookie{
+					Name:        "iface",
+					Value:       instanceKey,
+					Expires:     time.Now().Add(24 * time.Hour),
+					HTTPOnly:    true,
+					SessionOnly: true,
+				})
+			}
+		}
+
+		if c.Cookies("flash_error") != "" {
+			c.Bind(fiber.Map{
+				"FlashError": c.Cookies("flash_error"),
+			})
+			c.Cookie(&fiber.Cookie{
+				Name:        "flash_error",
+				Value:       "",
+				Expires:     time.Now().Add(-time.Hour),
+				HTTPOnly:    true,
+				SessionOnly: true,
+			})
+		}
+		if c.Cookies("flash_info") != "" {
+			c.Bind(fiber.Map{
+				"FlashInfo": c.Cookies("flash_info"),
+			})
+			c.Cookie(&fiber.Cookie{
+				Name:        "flash_info",
+				Value:       "",
+				Expires:     time.Now().Add(-time.Hour),
+				HTTPOnly:    true,
+				SessionOnly: true,
+			})
+
+		}
+		return c.Next()
 	})
 
-	app.Listen(":3000")
+	appHandler(app)
 
-	return
+	app.Listen(":3000")
 
 	// var cfg Config
 	// if _, err := toml.DecodeFile(*flagConfigPath, &cfg); err != nil {

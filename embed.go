@@ -11,12 +11,14 @@ import (
 //go:embed views assets
 var efs embed.FS
 
-func GetViews() (fs.FS, bool) {
+const Debug = false
+
+func GetViews() fs.FS {
 	f, err := fs.Sub(efs, "views")
 	if err != nil {
 		panic("failed to subfs")
 	}
-	return f, false
+	return f
 }
 
 func GetAssets() fs.FS {

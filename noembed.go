@@ -8,8 +8,10 @@ import (
 	"os"
 )
 
-func GetViews() (fs.FS, bool) {
-	return os.DirFS("./views"), true
+const Debug = true
+
+func GetViews() fs.FS {
+	return os.DirFS("./views")
 }
 
 func GetAssets() fs.FS {

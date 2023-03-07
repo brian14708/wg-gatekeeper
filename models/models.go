@@ -10,5 +10,8 @@ func Init(db *gorm.DB) {
 	DB = db
 	db.AutoMigrate(
 		&Interface{},
+		&Account{},
+		&Client{},
+		&AuditLog{},
 	)
 }
