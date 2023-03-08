@@ -145,10 +145,10 @@ SEC("classifier") int tc_prog(struct __sk_buff *skb) {
 
   int act;
   if (direction_out) {
-    act = throttle_flow((1 << 31) | cli->account_id, cli->throttle_out_rate_bps,
-                        skb);
+    act = throttle_flow((1 << 31) | cli->account_id,
+                        cli->throttle_out_rate_bps / 8, skb);
   } else {
-    act = throttle_flow(cli->account_id, cli->throttle_in_rate_bps, skb);
+    act = throttle_flow(cli->account_id, cli->throttle_in_rate_bps / 8, skb);
   }
 
   return act;

@@ -20,8 +20,10 @@
     <form action="/account" method="post">
         <label for="name">Account name</label>
         <input type="text" name="name" id="name" required>
-        <label for="bandwidth_limit">Bandwidth limit (MB/s)</label>
-        <input type="number" name="bandwidth_limit" id="bandwidth_limit" step=".01" required>
+        <label for="bandwidth_in_limit">Bandwidth in limit (Mb/s)</label>
+        <input type="number" name="bandwidth_in_limit" id="bandwidth_in_limit" step=".01" required>
+        <label for="bandwidth_out_limit">Bandwidth out limit (Mb/s)</label>
+        <input type="number" name="bandwidth_out_limit" id="bandwidth_out_limit" step=".01" required>
         <input type="submit" value="Create">
     </form>
 </dialog>

@@ -55,6 +55,9 @@ func (s *Syncer) Run() {
 			// update interface
 			var iface models.Interface
 			models.DB.First(&iface)
+			if iface.ID == 0 {
+				continue
+			}
 			i, err := wireguard.New(iface.Name, iface.PrivateKey, iface.ListenPort)
 			if err != nil {
 				panic(err)
@@ -86,7 +89,7 @@ func (s *Syncer) Run() {
 			models.DB.First(&iface)
 
 			rows, err := models.DB.Table("clients").
-				Select("clients.public_key, clients.ip_address, accounts.id, clients.id, accounts.bandwidth_limit").
+				Select("clients.public_key, clients.ip_address, accounts.id, clients.id, accounts.bandwidth_in_limit, accounts.bandwidth_out_limit").
 				Joins("left join accounts on accounts.id = clients.account_id").
 				Joins("left join interfaces on interfaces.id = accounts.interface_id").
 				Where("interfaces.id = ?", iface.ID).
@@ -101,8 +104,9 @@ func (s *Syncer) Run() {
 				var ipAddr string
 				var accountID int
 				var clientID int
-				var bandwidthLimit int64
-				rows.Scan(&pubKey, &ipAddr, &accountID, &clientID, &bandwidthLimit)
+				var bandwidthInLimit int64
+				var bandwidthOutLimit int64
+				rows.Scan(&pubKey, &ipAddr, &accountID, &clientID, &bandwidthInLimit, &bandwidthOutLimit)
 				k, err := wgtypes.NewKey([]byte(pubKey))
 				if err != nil {
 					panic(err)
@@ -110,9 +114,10 @@ func (s *Syncer) Run() {
 				peers[k] = ipAddr
 
 				accounts[ipAddr] = bwfilter.ClientAccount{
-					AccountID: uint32(accountID),
-					ClientID:  uint32(clientID),
-					Bandwidth: uint64(bandwidthLimit),
+					AccountID:    uint32(accountID),
+					ClientID:     uint32(clientID),
+					BandwidthIn:  uint64(bandwidthInLimit),
+					BandwidthOut: uint64(bandwidthOutLimit),
 				}
 			}
 			rows.Close()

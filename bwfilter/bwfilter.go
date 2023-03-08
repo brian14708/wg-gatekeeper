@@ -98,9 +98,10 @@ func (h *Handle) Close() error {
 }
 
 type ClientAccount struct {
-	ClientID  uint32
-	AccountID uint32
-	Bandwidth uint64
+	ClientID     uint32
+	AccountID    uint32
+	BandwidthIn  uint64
+	BandwidthOut uint64
 }
 
 func (h *Handle) UpdateClientAccount(ca map[string]ClientAccount) error {
@@ -111,8 +112,8 @@ func (h *Handle) UpdateClientAccount(ca map[string]ClientAccount) error {
 		if err := h.objs.ClientAccountMap.Update(&ii, &bwfilterClientInfo{
 			ClientId:           v.ClientID,
 			AccountId:          v.AccountID,
-			ThrottleInRateBps:  uint32(v.Bandwidth),
-			ThrottleOutRateBps: uint32(v.Bandwidth),
+			ThrottleInRateBps:  uint32(v.BandwidthIn),
+			ThrottleOutRateBps: uint32(v.BandwidthOut),
 		}, 0); err != nil {
 			return err
 		}

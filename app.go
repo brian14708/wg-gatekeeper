@@ -70,11 +70,17 @@ func appHandler(app *fiber.App) {
 		acc.Name = c.FormValue("name")
 		acc.InterfaceID = iface.ID
 
-		if bw, err := strconv.ParseFloat(c.FormValue("bandwidth_limit"), 64); err != nil {
+		if bw, err := strconv.ParseFloat(c.FormValue("bandwidth_in_limit"), 64); err != nil {
 			flashError(c, "Invalid bandwidth limit")
 			return c.Redirect("/")
 		} else {
-			acc.BandwidthLimit = int64(bw * 1024 * 1024)
+			acc.BandwidthInLimit = int64(bw * 1024 * 1024)
+		}
+		if bw, err := strconv.ParseFloat(c.FormValue("bandwidth_out_limit"), 64); err != nil {
+			flashError(c, "Invalid bandwidth limit")
+			return c.Redirect("/")
+		} else {
+			acc.BandwidthOutLimit = int64(bw * 1024 * 1024)
 		}
 		ret := models.DB.Create(&acc)
 		if ret.Error != nil {
@@ -88,11 +94,18 @@ func appHandler(app *fiber.App) {
 		var acc models.Account
 		models.DB.First(&acc, c.Params("id"))
 
-		if bw, err := strconv.ParseFloat(c.FormValue("bandwidth_limit"), 64); err != nil {
+		if bw, err := strconv.ParseFloat(c.FormValue("bandwidth_in_limit"), 64); err != nil {
 			flashError(c, "Invalid bandwidth limit")
 			return c.Redirect("/")
 		} else {
-			acc.BandwidthLimit = int64(bw * 1024 * 1024)
+			acc.BandwidthInLimit = int64(bw * 1024 * 1024)
+		}
+
+		if bw, err := strconv.ParseFloat(c.FormValue("bandwidth_out_limit"), 64); err != nil {
+			flashError(c, "Invalid bandwidth limit")
+			return c.Redirect("/")
+		} else {
+			acc.BandwidthOutLimit = int64(bw * 1024 * 1024)
 		}
 		ret := models.DB.Save(&acc)
 		if ret.Error != nil {
