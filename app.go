@@ -223,26 +223,17 @@ AllowedIPs = 0.0.0.0/0`,
 
 		links, _ := netlink.LinkList()
 		var attrs []*netlink.LinkAttrs
-		var ip string
 		for _, l := range links {
 			a := l.Attrs()
 			if a.Name == iface.Name || a.OperState == netlink.OperDown || a.Flags&net.FlagLoopback != 0 {
 				continue
 			}
 			attrs = append(attrs, a)
-			if ip == "" {
-				addrs, _ := netlink.AddrList(l, netlink.FAMILY_V4)
-				for _, addr := range addrs {
-					ip = addr.IP.String()
-					break
-				}
-			}
 		}
 
 		return c.Render("interface", fiber.Map{
-			"Iface":   iface,
-			"Links":   attrs,
-			"GuessIP": ip,
+			"Iface": iface,
+			"Links": attrs,
 		})
 	})
 
@@ -283,6 +274,19 @@ AllowedIPs = 0.0.0.0/0`,
 			syncer.UpdateInterface()
 			return c.Redirect("/")
 		}
+	})
+
+	// delete interface
+	app.Get("/interface/:id/delete", func(c *fiber.Ctx) error {
+		ret := models.DB.Unscoped().Delete(&models.Interface{}, c.Params("id"))
+		if ret.Error != nil {
+			flashError(c, ret.Error.Error())
+		} else {
+			flashInfo(c, "Interface deleted")
+		}
+		c.ClearCookie("iface")
+		syncer.DeleteInterface()
+		return c.Redirect("/interface")
 	})
 }
 

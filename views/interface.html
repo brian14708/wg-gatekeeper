@@ -24,3 +24,6 @@
 
     <input type="submit" value="Save">
 </form>
+{{ if .Iface.ID }}
+<a href="/interface/{{.Iface.ID}}/delete"><button>Delete</button></a>
+{{ end }}

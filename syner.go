@@ -13,6 +13,7 @@ type Syncer struct {
 	updateInterface chan struct{}
 	updateClients   chan struct{}
 	updateAccounts  chan struct{}
+	deleteInterface chan struct{}
 }
 
 func NewSyncer() *Syncer {
@@ -20,6 +21,7 @@ func NewSyncer() *Syncer {
 		updateInterface: make(chan struct{}, 1),
 		updateClients:   make(chan struct{}, 1),
 		updateAccounts:  make(chan struct{}, 1),
+		deleteInterface: make(chan struct{}, 1),
 	}
 	go s.Run()
 	return s
@@ -42,6 +44,13 @@ func (s *Syncer) UpdateClients() {
 func (s *Syncer) UpdateAccounts() {
 	select {
 	case s.updateAccounts <- struct{}{}:
+	default:
+	}
+}
+
+func (s *Syncer) DeleteInterface() {
+	select {
+	case s.deleteInterface <- struct{}{}:
 	default:
 	}
 }
@@ -82,6 +91,16 @@ func (s *Syncer) Run() {
 			wg = i
 			s.UpdateAccounts()
 			s.UpdateClients()
+
+		case <-s.deleteInterface:
+			if handle != nil {
+				handle.Close()
+				handle = nil
+			}
+			if wg != nil {
+				wg.Delete()
+				wg = nil
+			}
 
 		case <-s.updateClients:
 			// update clients
