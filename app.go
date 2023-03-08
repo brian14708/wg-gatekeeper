@@ -57,8 +57,36 @@ func appHandler(app *fiber.App) {
 		models.DB.Preload("Clients", func(db *gorm.DB) *gorm.DB {
 			return db.Order("clients.id DESC")
 		}).First(&acc, c.Params("id"))
+
+		rows, err := models.DB.Raw(
+			`SELECT audit_logs.destination, sum(audit_logs.bytes_in), sum(audit_logs.bytes_out) FROM audit_logs `+
+				`LEFT JOIN clients ON audit_logs.client_id = clients.id WHERE clients.account_id = ? AND start_time > ? `+
+				`GROUP BY audit_logs.destination ORDER BY SUM(audit_logs.bytes_in) DESC LIMIT 10`,
+			acc.ID,
+			time.Now().Add(-time.Hour*2),
+		).Rows()
+		if err != nil {
+			return c.SendStatus(500)
+		}
+		defer rows.Close()
+
+		type Traffic struct {
+			Destination string
+			BytesIn     int64
+			BytesOut    int64
+		}
+		var tf []Traffic
+		for rows.Next() {
+			var t Traffic
+			if err := rows.Scan(&t.Destination, &t.BytesIn, &t.BytesOut); err != nil {
+				return c.SendStatus(500)
+			}
+			tf = append(tf, t)
+		}
+
 		return c.Render("account", fiber.Map{
-			"Account": acc,
+			"Account":  acc,
+			"Traffics": tf,
 		})
 	})
 

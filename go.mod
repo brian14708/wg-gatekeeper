@@ -58,8 +58,8 @@ require (
 	github.com/vishvananda/netns v0.0.4 // indirect
 	github.com/yeqown/reedsolomon v1.0.0 // indirect
 	golang.org/x/crypto v0.7.0 // indirect
-	golang.org/x/exp/typeparams v0.0.0-20230306221820-f0f767cdffd6 // indirect
-	golang.org/x/image v0.0.0-20200927104501-e162460cd6b5 // indirect
+	golang.org/x/exp/typeparams v0.0.0-20230307190834-24139beb5833 // indirect
+	golang.org/x/image v0.6.0 // indirect
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 	golang.org/x/mod v0.9.0 // indirect
 	golang.org/x/net v0.8.0 // indirect

@@ -1,7 +1,11 @@
 package main
 
 import (
+	"encoding/binary"
+	"fmt"
 	"log"
+	"net"
+	"time"
 
 	"github.com/brian14708/wg-gatekeeper/bwfilter"
 	"github.com/brian14708/wg-gatekeeper/models"
@@ -55,11 +59,34 @@ func (s *Syncer) DeleteInterface() {
 	}
 }
 
+const (
+	AuditStep = time.Hour
+)
+
 func (s *Syncer) Run() {
 	var wg *wireguard.Interface
 	var handle *bwfilter.Handle
+	ticker := time.NewTimer(30 * time.Second)
 	for {
 		select {
+		case <-ticker.C:
+			if handle == nil {
+				ticker.Reset(30 * time.Second)
+				continue
+			}
+
+			m := handle.Metrics()
+			start := time.Now().Truncate(AuditStep)
+			end := start.Add(AuditStep)
+			for k, v := range m {
+				dest := fmt.Sprintf("%s:%d", net.IP(binary.LittleEndian.AppendUint32(nil, k.DestIP)), k.DestPort)
+				models.DB.Exec(
+					`INSERT INTO audit_logs (client_id, destination, start_time, end_time, bytes_in, bytes_out) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (client_id, destination, start_time) DO UPDATE SET bytes_in = bytes_in + ?, bytes_out = bytes_out + ?`,
+					k.ClientID, dest, start, end, v.BytesIn, v.BytesOut, v.BytesIn, v.BytesOut,
+				)
+			}
+			ticker.Reset(30 * time.Second)
+
 		case <-s.updateInterface:
 			// update interface
 			var iface models.Interface

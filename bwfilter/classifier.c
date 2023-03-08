@@ -5,6 +5,7 @@
 #include <linux/ip.h>
 #include <linux/pkt_cls.h>
 #include <linux/tcp.h>
+#include <linux/udp.h>
 
 //
 
@@ -47,6 +48,26 @@ struct {
   __uint(map_flags, BPF_F_NO_PREALLOC);
 } client_account_map SEC(".maps");
 
+struct metric_key {
+  uint32_t client_id;
+  uint32_t dest_ip;
+  uint16_t dest_port;
+  uint16_t padding;
+};
+
+struct metric_value {
+  uint64_t in_bytes;
+  uint64_t out_bytes;
+};
+
+struct {
+  __uint(type, BPF_MAP_TYPE_PERCPU_HASH);
+  __type(key, struct metric_key);
+  __type(value, struct metric_value);
+  __uint(max_entries, 65536);
+  __uint(map_flags, BPF_F_NO_PREALLOC);
+} metric_map SEC(".maps");
+
 static inline void get_flow_key(struct __sk_buff *skb, struct client_info **cli,
                                 int *direction_out, uint32_t *dest_ip,
                                 uint16_t *dest_port) {
@@ -83,6 +104,16 @@ static inline void get_flow_key(struct __sk_buff *skb, struct client_info **cli,
       *dest_port = tcph->dest;
     } else {
       *dest_port = tcph->source;
+    }
+  } else if (iph->protocol == IPPROTO_UDP) {
+    struct udphdr *udph = (struct udphdr *)(iph + 1);
+    if ((void *)(udph + 1) > (void *)(long)skb->data_end) {
+      return;
+    }
+    if (*direction_out) {
+      *dest_port = udph->dest;
+    } else {
+      *dest_port = udph->source;
     }
   }
 }
@@ -149,6 +180,31 @@ SEC("classifier") int tc_prog(struct __sk_buff *skb) {
                         cli->throttle_out_rate_bps / 8, skb);
   } else {
     act = throttle_flow(cli->account_id, cli->throttle_in_rate_bps / 8, skb);
+  }
+
+  if (act != TC_ACT_OK) {
+    return act;
+  }
+
+  struct metric_key key = {
+      .client_id = cli->client_id,
+      .dest_ip = dest_ip,
+      .dest_port = dest_port,
+  };
+
+  struct metric_value *val = bpf_map_lookup_elem(&metric_map, &key);
+  if (val) {
+    if (direction_out) {
+      val->out_bytes += skb->wire_len;
+    } else {
+      val->in_bytes += skb->wire_len;
+    }
+  } else {
+    struct metric_value new_val = {
+        .in_bytes = direction_out ? 0 : skb->wire_len,
+        .out_bytes = direction_out ? skb->wire_len : 0,
+    };
+    bpf_map_update_elem(&metric_map, &key, &new_val, BPF_ANY);
   }
 
   return act;

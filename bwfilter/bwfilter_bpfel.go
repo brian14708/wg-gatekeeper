@@ -20,6 +20,18 @@ type bwfilterClientInfo struct {
 	ThrottleOutRateBps uint32
 }
 
+type bwfilterMetricKey struct {
+	ClientId uint32
+	DestIp   uint32
+	DestPort uint16
+	Padding  uint16
+}
+
+type bwfilterMetricValue struct {
+	InBytes  uint64
+	OutBytes uint64
+}
+
 // loadBwfilter returns the embedded CollectionSpec for bwfilter.
 func loadBwfilter() (*ebpf.CollectionSpec, error) {
 	reader := bytes.NewReader(_BwfilterBytes)
@@ -70,6 +82,7 @@ type bwfilterProgramSpecs struct {
 type bwfilterMapSpecs struct {
 	ClientAccountMap *ebpf.MapSpec `ebpf:"client_account_map"`
 	FlowMap          *ebpf.MapSpec `ebpf:"flow_map"`
+	MetricMap        *ebpf.MapSpec `ebpf:"metric_map"`
 }
 
 // bwfilterObjects contains all objects after they have been loaded into the kernel.
@@ -93,12 +106,14 @@ func (o *bwfilterObjects) Close() error {
 type bwfilterMaps struct {
 	ClientAccountMap *ebpf.Map `ebpf:"client_account_map"`
 	FlowMap          *ebpf.Map `ebpf:"flow_map"`
+	MetricMap        *ebpf.Map `ebpf:"metric_map"`
 }
 
 func (m *bwfilterMaps) Close() error {
 	return _BwfilterClose(
 		m.ClientAccountMap,
 		m.FlowMap,
+		m.MetricMap,
 	)
 }
 

@@ -1,6 +1,25 @@
 <h2>👤 {{ .Account.Name }}</h2>
 
 <h3>
+    Most recent activity within the last 2 hours
+</h3>
+
+<table>
+    <tr>
+        <th>Destination</th>
+        <th>Download (MB)</th>
+        <th>Upload (MB)</th>
+    </tr>
+    {{ range .Traffics }}
+    <tr>
+        <td>{{ .Destination }}</td>
+        <td>{{ round (divf .BytesIn 1048576.0) 2 }}</td>
+        <td>{{ round (divf .BytesOut 1048576.0) 2 }}</td>
+    </tr>
+    {{ end }}
+</table>
+
+<h3>
     Clients
     <a href="#" onclick="document.getElementById('create-client').showModal();return false">[+]</a>
 </h3>
