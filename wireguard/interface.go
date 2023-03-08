@@ -2,6 +2,7 @@ package wireguard
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"strings"
@@ -195,47 +196,57 @@ func (i *Interface) NatAdd(iface string) error {
 		}
 	}
 
+	comment := fmt.Sprintf("wg-gatekeeper-%d", i.LinkIndex())
+
 	tbl, err := iptables.New()
 	if err != nil {
 		return err
 	}
-	rules, err := tbl.List("filter", "FORWARD")
-	if err != nil {
+
+	if err := clearChain(tbl, "filter", "FORWARD", comment); err != nil {
 		return err
 	}
-	for _, rule := range rules {
-		if strings.Contains(rule, "wg-gatekeeper") {
-			if err := tbl.Delete("filter", "FORWARD", strings.Split(strings.TrimPrefix(rule, "-A FORWARD "), " ")...); err != nil {
-				return err
-			}
-		}
-	}
-	rules, err = tbl.List("nat", "POSTROUTING")
-	if err != nil {
+	if err := clearChain(tbl, "nat", "POSTROUTING", comment); err != nil {
 		return err
 	}
-	for _, rule := range rules {
-		if strings.Contains(rule, "wg-gatekeeper") {
-			if err := tbl.Delete("nat", "POSTROUTING", strings.Split(strings.TrimPrefix(rule, "-A POSTROUTING "), " ")...); err != nil {
-				return err
-			}
-		}
+	if err := clearChain(tbl, "mangle", "PREROUTING", comment); err != nil {
+		return err
 	}
 	if iface == "" {
 		return nil
 	}
 
-	err = tbl.AppendUnique("filter", "FORWARD", "-i", i.name, "-j", "ACCEPT", "-m", "comment", "--comment", "wg-gatekeeper")
+	mark := fmt.Sprintf("0x%x", 0x500+i.LinkIndex())
+	err = tbl.AppendUnique("filter", "FORWARD", "-i", i.name, "-j", "ACCEPT", "-m", "comment", "--comment", comment)
 	if err != nil {
 		return err
 	}
-	err = tbl.AppendUnique("filter", "FORWARD", "-o", i.name, "-i", iface, "-j", "ACCEPT", "-m", "comment", "--comment", "wg-gatekeeper")
+	err = tbl.AppendUnique("filter", "FORWARD", "-o", i.name, "-i", iface, "-j", "ACCEPT", "-m", "comment", "--comment", comment)
 	if err != nil {
 		return err
 	}
-	err = tbl.AppendUnique("nat", "POSTROUTING", "-o", iface, "-j", "MASQUERADE", "-m", "comment", "--comment", "wg-gatekeeper")
+	err = tbl.AppendUnique("mangle", "PREROUTING", "-i", i.name, "-j", "MARK", "--set-mark", mark, "-m", "comment", "--comment", comment)
 	if err != nil {
 		return err
+	}
+	err = tbl.AppendUnique("nat", "POSTROUTING", "-o", iface, "-m", "mark", "--mark", mark, "-j", "MASQUERADE", "-m", "comment", "--comment", comment)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func clearChain(ipt *iptables.IPTables, tbl, chain, comment string) error {
+	rules, err := ipt.List(tbl, chain)
+	if err != nil {
+		return err
+	}
+	for _, rule := range rules {
+		if strings.Contains(rule, comment) {
+			if err := ipt.Delete(tbl, chain, strings.Split(strings.TrimPrefix(rule, "-A "+chain+" "), " ")...); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
