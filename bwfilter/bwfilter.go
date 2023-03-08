@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"unsafe"
 
+	"github.com/cilium/ebpf"
 	"github.com/florianl/go-tc"
 	"github.com/florianl/go-tc/core"
 	"golang.org/x/sys/unix"
@@ -17,6 +18,8 @@ import (
 
 type Handle struct {
 	objs bwfilterObjects
+
+	currClientAccount map[uint32]bwfilterClientInfo
 }
 
 func Attach(iface int) (*Handle, error) {
@@ -105,18 +108,49 @@ type ClientAccount struct {
 }
 
 func (h *Handle) UpdateClientAccount(ca map[string]ClientAccount) error {
-	// TODO better sync
+	if h.currClientAccount == nil {
+		h.currClientAccount = make(map[uint32]bwfilterClientInfo)
+		it := h.objs.ClientAccountMap.Iterate()
+		var key uint32
+		var value bwfilterClientInfo
+		for it.Next(&key, &value) {
+			h.currClientAccount[key] = value
+		}
+	}
+
+	keys := make(map[uint32]struct{})
+
 	for k, v := range ca {
 		i := net.ParseIP(k).To4()
 		ii := binary.LittleEndian.Uint32(i)
-		if err := h.objs.ClientAccountMap.Update(&ii, &bwfilterClientInfo{
+		val := bwfilterClientInfo{
 			ClientId:           v.ClientID,
 			AccountId:          v.AccountID,
 			ThrottleInRateBps:  uint32(v.BandwidthIn),
 			ThrottleOutRateBps: uint32(v.BandwidthOut),
-		}, 0); err != nil {
+		}
+		keys[ii] = struct{}{}
+		if ca, ok := h.currClientAccount[ii]; ok {
+			if ca == val {
+				continue
+			}
+		}
+		if err := h.objs.ClientAccountMap.Update(&ii, &val, ebpf.UpdateAny); err != nil {
 			return err
 		}
+		h.currClientAccount[ii] = val
 	}
+
+	for k := range h.currClientAccount {
+		if _, ok := keys[k]; !ok {
+			err := h.objs.ClientAccountMap.Delete(&k)
+			if err == nil || errors.Is(err, ebpf.ErrKeyNotExist) {
+				delete(h.currClientAccount, k)
+			} else {
+				return err
+			}
+		}
+	}
+
 	return nil
 }

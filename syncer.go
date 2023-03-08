@@ -147,10 +147,6 @@ func (s *Syncer) Run() {
 			}
 
 		case <-s.updateAccounts:
-			// update accounts
-			var iface models.Interface
-			models.DB.Preload("Accounts").First(&iface)
-			// TODO
 			s.UpdateClients()
 		}
 	}
