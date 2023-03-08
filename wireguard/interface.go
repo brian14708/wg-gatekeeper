@@ -184,7 +184,28 @@ func (i *Interface) Close() error {
 }
 
 func (i *Interface) Delete() error {
+	tbl, err := iptables.New()
+	if err != nil {
+		return err
+	}
+	if err := i.natDel(tbl); err != nil {
+		return err
+	}
 	return netlink.LinkDel(i.link)
+}
+
+func (i *Interface) natDel(tbl *iptables.IPTables) error {
+	comment := fmt.Sprintf("wg-gatekeeper-%d", i.LinkIndex())
+	if err := clearChain(tbl, "filter", "FORWARD", comment); err != nil {
+		return err
+	}
+	if err := clearChain(tbl, "nat", "POSTROUTING", comment); err != nil {
+		return err
+	}
+	if err := clearChain(tbl, "mangle", "PREROUTING", comment); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (i *Interface) NatAdd(iface string) error {
@@ -202,14 +223,8 @@ func (i *Interface) NatAdd(iface string) error {
 	if err != nil {
 		return err
 	}
-
-	if err := clearChain(tbl, "filter", "FORWARD", comment); err != nil {
-		return err
-	}
-	if err := clearChain(tbl, "nat", "POSTROUTING", comment); err != nil {
-		return err
-	}
-	if err := clearChain(tbl, "mangle", "PREROUTING", comment); err != nil {
+	err = i.natDel(tbl)
+	if err != nil {
 		return err
 	}
 	if iface == "" {

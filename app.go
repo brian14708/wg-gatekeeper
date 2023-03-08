@@ -272,7 +272,11 @@ AllowedIPs = 0.0.0.0/0`,
 		} else {
 			flashInfo(c, "Interface updated")
 			syncer.UpdateInterface()
-			return c.Redirect("/")
+			if c.FormValue("home") != "" {
+				return c.Redirect("/")
+			} else {
+				return c.Redirect("/interface")
+			}
 		}
 	})
 

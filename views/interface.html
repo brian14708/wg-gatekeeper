@@ -6,6 +6,7 @@
     <input type="text" name="name" id="name" required value="{{ .Iface.Name }}" readonly>
     {{ else }}
     <input type="text" name="name" id="name" required value="wg0">
+    <input type="hidden" name="home" id="home" required value="1">
     {{ end }}
     <label for="listen_port">Listen port</label>
     <input type="number" name="listen_port" id="listen_port" required min="1" max="65535"
@@ -20,7 +21,7 @@
     <label for="subnet">Subnet</label>
     <input type="text" name="subnet" id="subnet" required value="{{ default `192.168.5.1/24` .Iface.Subnet }}">
     <label for="external_ip">External IP</label>
-    <input type="text" name="external_ip" id="external_ip" required value="{{ default .GuessIP .Iface.ExternalIP }}">
+    <input type="text" name="external_ip" id="external_ip" required value="{{ .Iface.ExternalIP }}">
 
     <input type="submit" value="Save">
 </form>

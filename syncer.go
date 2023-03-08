@@ -83,11 +83,14 @@ func (s *Syncer) Run() {
 			if err != nil {
 				panic(err)
 			}
+			old := handle
 			handle, err = bwfilter.Attach(i.LinkIndex())
 			if err != nil {
 				log.Fatalf("attaching filter: %v", err)
 			}
-
+			if old != nil {
+				old.Close()
+			}
 			wg = i
 			s.UpdateAccounts()
 			s.UpdateClients()
