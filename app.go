@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"text/template"
 	"time"
 
 	"github.com/brian14708/wg-gatekeeper/models"
@@ -168,32 +169,26 @@ func appHandler(app *fiber.App) {
 		if err != nil {
 			panic(err)
 		}
-		config := fmt.Sprintf(`[Interface]
-Address = %s
-PrivateKey = %s
-DNS = 8.8.8.8
-[Peer]
-PublicKey = %s
-Endpoint = %s:%d
-AllowedIPs = 0.0.0.0/0`,
-			cli.IPAddress,
-			key.String(),
-			ikey.PublicKey().String(),
-			iface.ExternalIP,
-			iface.ListenPort,
-		)
+		var buf bytes.Buffer
+		wgTmpl.Execute(&buf, map[string]interface{}{
+			"Iface":            iface,
+			"ClientAddress":    cli.IPAddress,
+			"ClientPrivateKey": key.String(),
+			"ServerPublicKey":  ikey.PublicKey().String(),
+		})
 		ret := models.DB.Create(&cli)
 		if ret.Error != nil {
 			flashError(c, ret.Error.Error())
 			return c.Redirect("/account/" + c.Params("id"))
 		}
 
+		config := buf.String()
 		qrc, err := qrcode.NewWith(config, qrcode.WithErrorCorrectionLevel(qrcode.ErrorCorrectionLow))
 		if err != nil {
 			panic(err)
 		}
 
-		var buf bytes.Buffer
+		buf.Reset()
 		w := standard.NewWithWriter(base64.NewEncoder(base64.StdEncoding, &buf), standard.WithQRWidth(8))
 		if err = qrc.Save(w); err != nil {
 			fmt.Printf("could not save image: %v", err)
@@ -264,6 +259,7 @@ AllowedIPs = 0.0.0.0/0`,
 		iface.Subnet = c.FormValue("subnet")
 		iface.NatIface = c.FormValue("nat_iface")
 		iface.ExternalIP = c.FormValue("external_ip")
+		iface.DNS = c.FormValue("dns")
 
 		ret := models.DB.Save(&iface)
 		if ret.Error != nil {
@@ -326,3 +322,14 @@ func nextIP(ip net.IP, cidr *net.IPNet) (net.IP, error) {
 	}
 	return ip, nil
 }
+
+var (
+	wgTmpl = template.Must(template.New("index").Parse(`[Interface]
+Address = {{ .ClientAddress }}
+PrivateKey = {{ .ClientPrivateKey }}
+{{ if .Iface.DNS }}DNS = {{ .Iface.DNS }}{{ end }}
+[Peer]
+PublicKey = {{ .ServerPublicKey }}
+Endpoint = {{ .Iface.ExternalIP }}:{{ .Iface.ListenPort }}
+AllowedIPs = 0.0.0.0/0`))
+)

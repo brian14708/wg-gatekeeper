@@ -13,6 +13,7 @@ type Interface struct {
 	NatIface   string
 	Subnet     string
 	ExternalIP string
+	DNS        string
 
 	Accounts []Account `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
