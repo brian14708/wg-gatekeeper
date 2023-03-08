@@ -79,6 +79,9 @@ func (s *Syncer) Run() {
 			start := time.Now().Truncate(AuditStep)
 			end := start.Add(AuditStep)
 			for k, v := range m {
+				if v.BytesIn < 4096 && v.BytesOut < 4096 {
+					continue
+				}
 				dest := fmt.Sprintf("%s:%d", net.IP(binary.LittleEndian.AppendUint32(nil, k.DestIP)), k.DestPort)
 				models.DB.Exec(
 					`INSERT INTO audit_logs (client_id, destination, start_time, end_time, bytes_in, bytes_out) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (client_id, destination, start_time) DO UPDATE SET bytes_in = bytes_in + ?, bytes_out = bytes_out + ?`,

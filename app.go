@@ -84,9 +84,18 @@ func appHandler(app *fiber.App) {
 			tf = append(tf, t)
 		}
 
+		tot_rows := models.DB.Raw(
+			`SELECT sum(audit_logs.bytes_in), sum(audit_logs.bytes_out) FROM audit_logs `+
+				`LEFT JOIN clients ON audit_logs.client_id = clients.id WHERE clients.account_id = ?`,
+			acc.ID,
+		).Row()
+		var tot Traffic
+		tot_rows.Scan(&tot.BytesIn, &tot.BytesOut)
+
 		return c.Render("account", fiber.Map{
 			"Account":  acc,
 			"Traffics": tf,
+			"Total":    tot,
 		})
 	})
 
