@@ -44,10 +44,10 @@
 </h3>
 
 <form action="/account/{{ .Account.ID }}" method="post">
-    <label for="bandwidth_in_limit">Bandwidth in limit (Mb/s)</label>
+    <label for="bandwidth_in_limit">Download bandwidth limit (Mb/s)</label>
     <input type="number" name="bandwidth_in_limit" step=".01" id="bandwidth_in_limit" required
         value="{{ round (divf .Account.BandwidthInLimit 1048576.0) 2 }}">
-    <label for="bandwidth_out_limit">Bandwidth out limit (Mb/s)</label>
+    <label for="bandwidth_out_limit">Upload bandwidth limit (Mb/s)</label>
     <input type="number" name="bandwidth_out_limit" step=".01" id="bandwidth_out_limit" required
         value="{{ round (divf .Account.BandwidthOutLimit 1048576.0) 2 }}">
     <input type="submit" value="Update">
