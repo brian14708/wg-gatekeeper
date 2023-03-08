@@ -5,17 +5,21 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"syscall"
 	"unsafe"
 
-	"github.com/cilium/ebpf/link"
 	"github.com/florianl/go-tc"
 	"github.com/florianl/go-tc/core"
 	"golang.org/x/sys/unix"
 )
 
-func Attach(iface int) (link.Link, error) {
+type Handle struct {
+	objs bwfilterObjects
+}
+
+func Attach(iface int) (*Handle, error) {
 	objs := bwfilterObjects{}
 	if err := loadBwfilterObjects(&objs, nil); err != nil {
 		log.Fatalf("loading objects: %s", err)
@@ -84,5 +88,34 @@ func Attach(iface int) (link.Link, error) {
 		}
 	}
 
-	return nil, nil
+	return &Handle{
+		objs: objs,
+	}, nil
+}
+
+func (h *Handle) Close() error {
+	return h.objs.Close()
+}
+
+type ClientAccount struct {
+	ClientID  uint32
+	AccountID uint32
+	Bandwidth uint64
+}
+
+func (h *Handle) UpdateClientAccount(ca map[string]ClientAccount) error {
+	// TODO better sync
+	for k, v := range ca {
+		i := net.ParseIP(k).To4()
+		ii := binary.LittleEndian.Uint32(i)
+		if err := h.objs.ClientAccountMap.Update(&ii, &bwfilterClientInfo{
+			ClientId:           v.ClientID,
+			AccountId:          v.AccountID,
+			ThrottleInRateBps:  uint32(v.Bandwidth),
+			ThrottleOutRateBps: uint32(v.Bandwidth),
+		}, 0); err != nil {
+			return err
+		}
+	}
+	return nil
 }

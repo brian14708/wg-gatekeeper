@@ -158,6 +158,7 @@ func appHandler(app *fiber.App) {
 		config := fmt.Sprintf(`[Interface]
 Address = %s
 PrivateKey = %s
+DNS = 8.8.8.8
 [Peer]
 PublicKey = %s
 Endpoint = %s:%d

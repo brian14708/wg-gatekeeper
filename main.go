@@ -102,11 +102,4 @@ func main() {
 	appHandler(app)
 
 	app.Listen(*flagListen)
-
-	// _, err = bwfilter.Attach(wg.LinkIndex())
-	// if err != nil {
-	// 	log.Fatalf("attaching filter: %v", err)
-	// }
-	// // defer l.Close()
-
 }

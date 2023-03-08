@@ -1,6 +1,9 @@
 package main
 
 import (
+	"log"
+
+	"github.com/brian14708/wg-gatekeeper/bwfilter"
 	"github.com/brian14708/wg-gatekeeper/models"
 	"github.com/brian14708/wg-gatekeeper/wireguard"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -45,6 +48,7 @@ func (s *Syncer) UpdateAccounts() {
 
 func (s *Syncer) Run() {
 	var wg *wireguard.Interface
+	var handle *bwfilter.Handle
 	for {
 		select {
 		case <-s.updateInterface:
@@ -67,16 +71,22 @@ func (s *Syncer) Run() {
 			if err != nil {
 				panic(err)
 			}
+			handle, err = bwfilter.Attach(i.LinkIndex())
+			if err != nil {
+				log.Fatalf("attaching filter: %v", err)
+			}
+
 			wg = i
 			s.UpdateAccounts()
 			s.UpdateClients()
+
 		case <-s.updateClients:
 			// update clients
 			var iface models.Interface
 			models.DB.First(&iface)
 
 			rows, err := models.DB.Table("clients").
-				Select("clients.public_key, clients.ip_address").
+				Select("clients.public_key, clients.ip_address, accounts.id, clients.id, accounts.bandwidth_limit").
 				Joins("left join accounts on accounts.id = clients.account_id").
 				Joins("left join interfaces on interfaces.id = accounts.interface_id").
 				Where("interfaces.id = ?", iface.ID).
@@ -85,18 +95,32 @@ func (s *Syncer) Run() {
 				panic(err)
 			}
 			peers := make(map[wgtypes.Key]string)
+			accounts := make(map[string]bwfilter.ClientAccount)
 			for rows.Next() {
 				var pubKey string
 				var ipAddr string
-				rows.Scan(&pubKey, &ipAddr)
+				var accountID int
+				var clientID int
+				var bandwidthLimit int64
+				rows.Scan(&pubKey, &ipAddr, &accountID, &clientID, &bandwidthLimit)
 				k, err := wgtypes.NewKey([]byte(pubKey))
 				if err != nil {
 					panic(err)
 				}
 				peers[k] = ipAddr
+
+				accounts[ipAddr] = bwfilter.ClientAccount{
+					AccountID: uint32(accountID),
+					ClientID:  uint32(clientID),
+					Bandwidth: uint64(bandwidthLimit),
+				}
 			}
 			rows.Close()
 			wg.PeerSync(peers)
+
+			if err := handle.UpdateClientAccount(accounts); err != nil {
+				log.Fatalf("updating client account: %v", err)
+			}
 
 		case <-s.updateAccounts:
 			// update accounts

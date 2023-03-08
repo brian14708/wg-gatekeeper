@@ -13,6 +13,13 @@ import (
 	"github.com/cilium/ebpf"
 )
 
+type bwfilterClientInfo struct {
+	ClientId           uint32
+	AccountId          uint32
+	ThrottleInRateBps  uint32
+	ThrottleOutRateBps uint32
+}
+
 // loadBwfilter returns the embedded CollectionSpec for bwfilter.
 func loadBwfilter() (*ebpf.CollectionSpec, error) {
 	reader := bytes.NewReader(_BwfilterBytes)
@@ -61,7 +68,8 @@ type bwfilterProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type bwfilterMapSpecs struct {
-	FlowMap *ebpf.MapSpec `ebpf:"flow_map"`
+	ClientAccountMap *ebpf.MapSpec `ebpf:"client_account_map"`
+	FlowMap          *ebpf.MapSpec `ebpf:"flow_map"`
 }
 
 // bwfilterObjects contains all objects after they have been loaded into the kernel.
@@ -83,11 +91,13 @@ func (o *bwfilterObjects) Close() error {
 //
 // It can be passed to loadBwfilterObjects or ebpf.CollectionSpec.LoadAndAssign.
 type bwfilterMaps struct {
-	FlowMap *ebpf.Map `ebpf:"flow_map"`
+	ClientAccountMap *ebpf.Map `ebpf:"client_account_map"`
+	FlowMap          *ebpf.Map `ebpf:"flow_map"`
 }
 
 func (m *bwfilterMaps) Close() error {
 	return _BwfilterClose(
+		m.ClientAccountMap,
 		m.FlowMap,
 	)
 }
