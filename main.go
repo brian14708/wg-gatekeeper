@@ -37,6 +37,10 @@ func main() {
 	syncer = NewSyncer()
 	syncer.UpdateInterface()
 
+	if *flagEnovyTcp > 0 {
+		startLog()
+	}
+
 	vfs := GetViews()
 	engine := html.NewFileSystem(http.FS(vfs), ".html")
 	engine.AddFuncMap(sprig.FuncMap())

@@ -30,12 +30,15 @@ static_resources:
           stat_prefix: tcp_proxy
           cluster: PassthroughCluster
           access_log:
-          - name: envoy.access_loggers.file
+          - name: envoy.access_loggers.http_grpc
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
-              log_format:
-                text_format: "TLS %REQ(:AUTHORITY)% %UPSTREAM_HOST% %REQUESTED_SERVER_NAME%\n"
-              path: /dev/stdout
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig
+              common_config:
+                grpc_service:
+                  envoy_grpc:
+                    cluster_name: service_accesslog
+                log_name: tls_proxy
+                transport_api_version: V3
     - filter_chain_match:
         application_protocols:
           - http/1.0
@@ -61,12 +64,15 @@ static_resources:
                     route:
                       cluster: PassthroughCluster
           access_log:
-          - name: envoy.access_loggers.file
+          - name: envoy.access_loggers.http_grpc
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
-              log_format:
-                text_format: "HTTP %REQ(:AUTHORITY)% %UPSTREAM_HOST% %REQUESTED_SERVER_NAME%\n"
-              path: /dev/stdout
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig
+              common_config:
+                grpc_service:
+                  envoy_grpc:
+                    cluster_name: service_accesslog
+                log_name: http_proxy
+                transport_api_version: V3
     - filter_chain_match:
       filters:
       - name: envoy.filters.network.tcp_proxy
@@ -75,15 +81,31 @@ static_resources:
           stat_prefix: tcp_proxy
           cluster: PassthroughCluster
           access_log:
-          - name: envoy.access_loggers.file
+          - name: envoy.access_loggers.http_grpc
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
-              log_format:
-                text_format: "FALLBACK %REQ(:AUTHORITY)% %UPSTREAM_HOST% %REQUESTED_SERVER_NAME%\n"
-              path: /dev/stdout
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig
+              common_config:
+                grpc_service:
+                  envoy_grpc:
+                    cluster_name: service_accesslog
+                log_name: tcp_proxy
+                transport_api_version: V3
   clusters:
   - name: PassthroughCluster
     type: ORIGINAL_DST
     connect_timeout: 10s
     lb_policy: CLUSTER_PROVIDED
     connectTimeout: 10s
+  - name: service_accesslog
+    connect_timeout: 6s
+    type: LOGICAL_DNS
+    load_assignment:
+      cluster_name: service_accesslog
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 9001
+    http2_protocol_options: {}

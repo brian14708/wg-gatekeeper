@@ -9,6 +9,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/brian14708/wg-gatekeeper/auditlog"
 	"github.com/brian14708/wg-gatekeeper/models"
 
 	"github.com/gofiber/fiber/v2"
@@ -58,44 +59,35 @@ func appHandler(app *fiber.App) {
 			return db.Order("clients.id DESC")
 		}).First(&acc, c.Params("id"))
 
-		rows, err := models.DB.Raw(
-			`SELECT audit_logs.destination, sum(audit_logs.bytes_in), sum(audit_logs.bytes_out) FROM audit_logs `+
-				`LEFT JOIN clients ON audit_logs.client_id = clients.id WHERE clients.account_id = ? AND start_time > ? `+
-				`GROUP BY audit_logs.destination ORDER BY SUM(audit_logs.bytes_in) DESC LIMIT 10`,
-			acc.ID,
-			time.Now().Add(-time.Hour*2),
-		).Rows()
-		if err != nil {
-			return c.SendStatus(500)
-		}
-		defer rows.Close()
-
-		type Traffic struct {
-			Destination string
-			BytesIn     int64
-			BytesOut    int64
-		}
-		var tf []Traffic
-		for rows.Next() {
-			var t Traffic
-			if err := rows.Scan(&t.Destination, &t.BytesIn, &t.BytesOut); err != nil {
+		var al []auditlog.AccessLog
+		var totalSent, totalRecv uint64
+		var audit bool
+		if auditDB != nil {
+			audit = true
+			var cips []net.IP
+			for _, c := range acc.Clients {
+				cips = append(cips, net.ParseIP(c.IPAddress).To4())
+			}
+			var err error
+			al, err = auditDB.Query(cips, time.Now().UTC().Add(-time.Hour*2), 10)
+			if err != nil {
+				fmt.Println(err)
 				return c.SendStatus(500)
 			}
-			tf = append(tf, t)
+
+			totalSent, totalRecv, err = auditDB.Total(cips)
+			if err != nil {
+				fmt.Println(err)
+				return c.SendStatus(500)
+			}
 		}
 
-		tot_rows := models.DB.Raw(
-			`SELECT sum(audit_logs.bytes_in), sum(audit_logs.bytes_out) FROM audit_logs `+
-				`LEFT JOIN clients ON audit_logs.client_id = clients.id WHERE clients.account_id = ?`,
-			acc.ID,
-		).Row()
-		var tot Traffic
-		tot_rows.Scan(&tot.BytesIn, &tot.BytesOut)
-
 		return c.Render("account", fiber.Map{
-			"Account":  acc,
-			"Traffics": tf,
-			"Total":    tot,
+			"Account":      acc,
+			"AuditEnabled": audit,
+			"AccessLog":    al,
+			"TotalSent":    totalSent,
+			"TotalRecv":    totalRecv,
 		})
 	})
 

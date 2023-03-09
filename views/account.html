@@ -1,26 +1,28 @@
 <h2 style="text-align:center">👤 {{ .Account.Name }}</h2>
 
+{{ if .AuditEnabled }}
 <h3>Recent activities</h3>
 
 <table>
     <tr>
         <th>Destination</th>
-        <th>Download (MB)</th>
-        <th>Upload (MB)</th>
+        <th style="width:15%">Download (MB)</th>
+        <th style="width:15%">Upload (MB)</th>
     </tr>
     <tr>
-        <th>All</th>
-        <td>{{ round (divf .Total.BytesIn 1048576.0) 2 }}</td>
-        <td>{{ round (divf .Total.BytesOut 1048576.0) 2 }}</td>
+        <th>Total</th>
+        <td>{{ round (divf .TotalRecv 1048576.0) 2 }}</td>
+        <td>{{ round (divf .TotalSent 1048576.0) 2 }}</td>
     </tr>
-    {{ range .Traffics }}
+    {{ range .AccessLog }}
     <tr>
-        <td>{{ .Destination }}</td>
-        <td>{{ round (divf .BytesIn 1048576.0) 2 }}</td>
-        <td>{{ round (divf .BytesOut 1048576.0) 2 }}</td>
+        <td class="monospace">{{ .ServerName }}</td>
+        <td>{{ round (divf .Recv 1048576.0) 2 }}</td>
+        <td>{{ round (divf .Sent 1048576.0) 2 }}</td>
     </tr>
     {{ end }}
 </table>
+{{ end }}
 
 <h3>
     Clients
