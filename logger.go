@@ -50,8 +50,8 @@ func (ls *LogServer) StreamAccessLogs(s v3.AccessLogService_StreamAccessLogsServ
 				ts = t.AsTime()
 			}
 			err := ls.db.Insert(
-				l.GetCommonProperties().GetDownstreamRemoteAddress().GetSocketAddress().GetAddress(),
-				uint16(l.GetCommonProperties().GetDownstreamRemoteAddress().GetSocketAddress().GetPortValue()),
+				l.GetCommonProperties().GetDownstreamDirectRemoteAddress().GetSocketAddress().GetAddress(),
+				uint16(l.GetCommonProperties().GetDownstreamDirectRemoteAddress().GetSocketAddress().GetPortValue()),
 				l.GetCommonProperties().GetUpstreamRemoteAddress().GetSocketAddress().GetAddress(),
 				uint16(l.GetCommonProperties().GetUpstreamRemoteAddress().GetSocketAddress().GetPortValue()),
 				l.GetRequest().GetRequestHeadersBytes()+l.GetRequest().GetRequestBodyBytes(),
@@ -76,12 +76,12 @@ func (ls *LogServer) StreamAccessLogs(s v3.AccessLogService_StreamAccessLogsServ
 				proto = auditlog.ProtocolTLS
 			}
 			err := ls.db.Insert(
-				l.GetCommonProperties().GetDownstreamRemoteAddress().GetSocketAddress().GetAddress(),
-				uint16(l.GetCommonProperties().GetDownstreamRemoteAddress().GetSocketAddress().GetPortValue()),
+				l.GetCommonProperties().GetDownstreamDirectRemoteAddress().GetSocketAddress().GetAddress(),
+				uint16(l.GetCommonProperties().GetDownstreamDirectRemoteAddress().GetSocketAddress().GetPortValue()),
 				l.GetCommonProperties().GetUpstreamRemoteAddress().GetSocketAddress().GetAddress(),
 				uint16(l.GetCommonProperties().GetUpstreamRemoteAddress().GetSocketAddress().GetPortValue()),
-				l.GetConnectionProperties().GetSentBytes(),
 				l.GetConnectionProperties().GetReceivedBytes(),
+				l.GetConnectionProperties().GetSentBytes(),
 				proto,
 				l.GetCommonProperties().GetTlsProperties().GetTlsSniHostname(),
 				ts,
