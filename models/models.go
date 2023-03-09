@@ -12,6 +12,5 @@ func Init(db *gorm.DB) {
 		&Interface{},
 		&Account{},
 		&Client{},
-		&AuditLog{},
 	)
 }

@@ -10,5 +10,4 @@ type Client struct {
 	IPAddress string `gorm:"uniqueIndex"`
 
 	AccountID int
-	AuditLogs []AuditLog `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
