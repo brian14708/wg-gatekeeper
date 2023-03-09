@@ -17,21 +17,14 @@ var (
 	auditDB *auditlog.DB
 )
 
-func startLog() {
+func startLog(srv *grpc.Server) {
 	d, err := auditlog.New()
 	if err != nil {
 		log.Fatalf("failed to open auditlog: %v", err)
 	}
 	auditDB = d
 
-	grpcServer := grpc.NewServer()
-	v3.RegisterAccessLogServiceServer(grpcServer, &LogServer{d})
-
-	l, err := net.Listen("tcp", ":9001")
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
-	}
-	go grpcServer.Serve(l)
+	v3.RegisterAccessLogServiceServer(srv, &LogServer{d})
 }
 
 type LogServer struct {

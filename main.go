@@ -2,7 +2,10 @@ package main
 
 import (
 	"flag"
+	"fmt"
+	"log"
 	"math/rand"
+	"net"
 	"net/http"
 	"strconv"
 	"time"
@@ -11,6 +14,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
 	"github.com/gofiber/template/html"
+	"google.golang.org/grpc"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
@@ -18,9 +22,11 @@ import (
 )
 
 var (
-	flagDBPath   = flag.String("db", "db.sqlite", "path to database")
-	flagListen   = flag.String("listen", ":3000", "address to listen on")
-	flagEnovyTcp = flag.Int("envoy-tcp-proxy", -1, "port for envoy tcp proxy")
+	flagDBPath      = flag.String("db", "db.sqlite", "path to database")
+	flagListen      = flag.String("listen", ":3000", "address to listen on")
+	flagEnvoy       = flag.Bool("envoy", false, "enable envoy tcp proxy")
+	flagEnvoyListen = flag.Int("envoy-listen", 9001, "port for envoy tcp proxy")
+	flagEnvoyTcp    = flag.Int("envoy-tcp-proxy", 15000, "port for envoy tcp proxy")
 
 	syncer *Syncer
 )
@@ -37,8 +43,16 @@ func main() {
 	syncer = NewSyncer()
 	syncer.UpdateInterface()
 
-	if *flagEnovyTcp > 0 {
-		startLog()
+	if *flagEnvoy {
+		grpcServer := grpc.NewServer()
+		startLog(grpcServer)
+		newXdsServer(grpcServer)
+
+		l, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", *flagEnvoyListen))
+		if err != nil {
+			log.Fatalf("failed to listen: %v", err)
+		}
+		go grpcServer.Serve(l)
 	}
 
 	vfs := GetViews()

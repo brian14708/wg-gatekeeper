@@ -211,7 +211,7 @@ func (i *Interface) natDel(tbl *iptables.IPTables) error {
 	return nil
 }
 
-func (i *Interface) NatAdd(iface string, envoy int) error {
+func (i *Interface) NatAdd(iface string, tcpForward int) error {
 	if val, err := sysctl.Get("net.ipv4.ip_forward"); err != nil {
 		return err
 	} else if val != "1" {
@@ -247,8 +247,8 @@ func (i *Interface) NatAdd(iface string, envoy int) error {
 	if err != nil {
 		return err
 	}
-	if envoy > 0 {
-		err = tbl.AppendUnique("nat", "PREROUTING", "-i", i.name, "-p", "tcp", "-j", "REDIRECT", "--to-port", fmt.Sprintf("%d", envoy))
+	if tcpForward > 0 {
+		err = tbl.AppendUnique("nat", "PREROUTING", "-i", i.name, "-p", "tcp", "-j", "REDIRECT", "--to-port", fmt.Sprintf("%d", tcpForward), "-m", "comment", "--comment", comment)
 		if err != nil {
 			return err
 		}

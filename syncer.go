@@ -80,7 +80,11 @@ func (s *Syncer) Run() {
 			if err != nil {
 				panic(err)
 			}
-			err = i.NatAdd(iface.NatIface, *flagEnovyTcp)
+			if *flagEnvoy {
+				err = i.NatAdd(iface.NatIface, *flagEnvoyTcp)
+			} else {
+				err = i.NatAdd(iface.NatIface, -1)
+			}
 			if err != nil {
 				panic(err)
 			}
