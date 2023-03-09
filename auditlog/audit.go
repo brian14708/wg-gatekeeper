@@ -60,8 +60,8 @@ const (
 )
 
 func (db *DB) Insert(
-	src string, srcPort uint16,
-	dst string, dstPort uint16,
+	src net.IP, srcPort uint16,
+	dst net.IP, dstPort uint16,
 	sentBytes uint64, receivedBytes uint64,
 	protocol Protocol, serverName string,
 	startTime time.Time,
@@ -73,13 +73,13 @@ func (db *DB) Insert(
 		serverName = fmt.Sprintf("%s:%d", dst, dstPort)
 	}
 
-	tmp := net.ParseIP(src).To4()
+	tmp := src.To4()
 	if tmp == nil {
 		tmp = net.IPv4zero
 	}
 	srcIP := binary.BigEndian.Uint32(tmp)
 
-	tmp = net.ParseIP(dst).To4()
+	tmp = dst.To4()
 	if tmp == nil {
 		tmp = net.IPv4zero
 	}

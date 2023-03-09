@@ -34,7 +34,6 @@ struct {
 } flow_map SEC(".maps");
 
 struct client_info {
-  uint32_t client_id;
   uint32_t account_id;
   uint32_t throttle_in_rate_bps;
   uint32_t throttle_out_rate_bps;
@@ -48,33 +47,14 @@ struct {
   __uint(map_flags, BPF_F_NO_PREALLOC);
 } client_account_map SEC(".maps");
 
-struct metric_key {
-  uint32_t client_id;
-  uint32_t dest_ip;
-  uint16_t dest_port;
-  uint16_t padding;
+enum flags {
+  FLAGS_OUT = 1,
 };
-
-struct metric_value {
-  uint64_t in_bytes;
-  uint64_t out_bytes;
-};
-
-struct {
-  __uint(type, BPF_MAP_TYPE_PERCPU_HASH);
-  __type(key, struct metric_key);
-  __type(value, struct metric_value);
-  __uint(max_entries, 65536);
-  __uint(map_flags, BPF_F_NO_PREALLOC);
-} metric_map SEC(".maps");
 
 static inline void get_flow_key(struct __sk_buff *skb, struct client_info **cli,
-                                int *direction_out, uint32_t *dest_ip,
-                                uint16_t *dest_port) {
-  *direction_out = 1;
+                                int *flags) {
+  *flags = FLAGS_OUT;
   *cli = NULL;
-  *dest_ip = 0;
-  *dest_port = 0;
 
   struct iphdr *iph = (void *)(long)skb->data;
   if ((void *)(iph + 1) > (void *)(long)skb->data_end) {
@@ -84,37 +64,13 @@ static inline void get_flow_key(struct __sk_buff *skb, struct client_info **cli,
     return;
   }
 
-  *cli = (struct client_info *)bpf_map_lookup_elem(&client_account_map,
-                                                   &iph->saddr);
-  *dest_ip = iph->daddr;
+  uint32_t ip = bpf_ntohl(iph->saddr);
+  *cli = (struct client_info *)bpf_map_lookup_elem(&client_account_map, &ip);
 
   if (*cli == NULL) {
-    *cli = (struct client_info *)bpf_map_lookup_elem(&client_account_map,
-                                                     &iph->daddr);
-    *dest_ip = iph->saddr;
-    *direction_out = 0;
-  }
-
-  if (iph->protocol == IPPROTO_TCP) {
-    struct tcphdr *tcph = (struct tcphdr *)(iph + 1);
-    if ((void *)(tcph + 1) > (void *)(long)skb->data_end) {
-      return;
-    }
-    if (*direction_out) {
-      *dest_port = tcph->dest;
-    } else {
-      *dest_port = tcph->source;
-    }
-  } else if (iph->protocol == IPPROTO_UDP) {
-    struct udphdr *udph = (struct udphdr *)(iph + 1);
-    if ((void *)(udph + 1) > (void *)(long)skb->data_end) {
-      return;
-    }
-    if (*direction_out) {
-      *dest_port = udph->dest;
-    } else {
-      *dest_port = udph->source;
-    }
+    ip = bpf_ntohl(iph->daddr);
+    *cli = (struct client_info *)bpf_map_lookup_elem(&client_account_map, &ip);
+    *flags &= ~FLAGS_OUT;
   }
 }
 
@@ -166,45 +122,19 @@ static inline int throttle_flow(int key, uint64_t limit,
 
 SEC("classifier") int tc_prog(struct __sk_buff *skb) {
   struct client_info *cli;
-  int direction_out;
-  uint32_t dest_ip;
-  uint16_t dest_port;
-  get_flow_key(skb, &cli, &direction_out, &dest_ip, &dest_port);
+  int flag;
+  get_flow_key(skb, &cli, &flag);
+
   if (cli == NULL) {
     return throttle_flow(0, THROTTLE_RATE_BPS, skb);
   }
 
   int act;
-  if (direction_out) {
+  if (flag & FLAGS_OUT) {
     act = throttle_flow((1 << 31) | cli->account_id,
                         cli->throttle_out_rate_bps / 8, skb);
   } else {
     act = throttle_flow(cli->account_id, cli->throttle_in_rate_bps / 8, skb);
-  }
-
-  if (act != TC_ACT_OK) {
-    return act;
-  }
-
-  struct metric_key key = {
-      .client_id = cli->client_id,
-      .dest_ip = dest_ip,
-      .dest_port = dest_port,
-  };
-
-  struct metric_value *val = bpf_map_lookup_elem(&metric_map, &key);
-  if (val) {
-    if (direction_out) {
-      val->out_bytes += skb->wire_len;
-    } else {
-      val->in_bytes += skb->wire_len;
-    }
-  } else {
-    struct metric_value new_val = {
-        .in_bytes = direction_out ? 0 : skb->wire_len,
-        .out_bytes = direction_out ? skb->wire_len : 0,
-    };
-    bpf_map_update_elem(&metric_map, &key, &new_val, BPF_ANY);
   }
 
   return act;

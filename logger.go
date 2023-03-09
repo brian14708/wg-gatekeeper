@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"time"
@@ -39,6 +41,9 @@ type LogServer struct {
 func (ls *LogServer) StreamAccessLogs(s v3.AccessLogService_StreamAccessLogsServer) error {
 	for {
 		msg, err := s.Recv()
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
 		if err != nil {
 			return err
 		}
@@ -50,9 +55,9 @@ func (ls *LogServer) StreamAccessLogs(s v3.AccessLogService_StreamAccessLogsServ
 				ts = t.AsTime()
 			}
 			err := ls.db.Insert(
-				l.GetCommonProperties().GetDownstreamDirectRemoteAddress().GetSocketAddress().GetAddress(),
+				net.ParseIP(l.GetCommonProperties().GetDownstreamDirectRemoteAddress().GetSocketAddress().GetAddress()),
 				uint16(l.GetCommonProperties().GetDownstreamDirectRemoteAddress().GetSocketAddress().GetPortValue()),
-				l.GetCommonProperties().GetUpstreamRemoteAddress().GetSocketAddress().GetAddress(),
+				net.ParseIP(l.GetCommonProperties().GetUpstreamRemoteAddress().GetSocketAddress().GetAddress()),
 				uint16(l.GetCommonProperties().GetUpstreamRemoteAddress().GetSocketAddress().GetPortValue()),
 				l.GetRequest().GetRequestHeadersBytes()+l.GetRequest().GetRequestBodyBytes(),
 				l.GetResponse().GetResponseHeadersBytes()+l.GetResponse().GetResponseBodyBytes(),
@@ -76,9 +81,9 @@ func (ls *LogServer) StreamAccessLogs(s v3.AccessLogService_StreamAccessLogsServ
 				proto = auditlog.ProtocolTLS
 			}
 			err := ls.db.Insert(
-				l.GetCommonProperties().GetDownstreamDirectRemoteAddress().GetSocketAddress().GetAddress(),
+				net.ParseIP(l.GetCommonProperties().GetDownstreamDirectRemoteAddress().GetSocketAddress().GetAddress()),
 				uint16(l.GetCommonProperties().GetDownstreamDirectRemoteAddress().GetSocketAddress().GetPortValue()),
-				l.GetCommonProperties().GetUpstreamRemoteAddress().GetSocketAddress().GetAddress(),
+				net.ParseIP(l.GetCommonProperties().GetUpstreamRemoteAddress().GetSocketAddress().GetAddress()),
 				uint16(l.GetCommonProperties().GetUpstreamRemoteAddress().GetSocketAddress().GetPortValue()),
 				l.GetConnectionProperties().GetReceivedBytes(),
 				l.GetConnectionProperties().GetSentBytes(),

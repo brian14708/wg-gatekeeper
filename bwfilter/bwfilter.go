@@ -7,9 +7,7 @@ import (
 	"log"
 	"net"
 	"os"
-	"sync"
 	"syscall"
-	"time"
 	"unsafe"
 
 	"github.com/cilium/ebpf"
@@ -23,9 +21,6 @@ type Handle struct {
 	objs bwfilterObjects
 
 	currClientAccount map[uint32]bwfilterClientInfo
-
-	mu          sync.Mutex
-	currMetrics map[MetricKey]Metric
 }
 
 func Attach(iface int) (*Handle, error) {
@@ -98,11 +93,9 @@ func Attach(iface int) (*Handle, error) {
 	}
 
 	h := &Handle{
-		objs:        objs,
-		done:        make(chan struct{}),
-		currMetrics: make(map[MetricKey]Metric),
+		objs: objs,
+		done: make(chan struct{}),
 	}
-	go h.run()
 	return h, nil
 }
 
@@ -111,59 +104,7 @@ func (h *Handle) Close() error {
 	return h.objs.Close()
 }
 
-func (h *Handle) run() {
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ticker.C:
-		case <-h.done:
-			return
-		}
-
-		it := h.objs.MetricMap.Iterate()
-		var key bwfilterMetricKey
-		var value []bwfilterMetricValue
-		h.mu.Lock()
-		for it.Next(&key, &value) {
-			h.objs.MetricMap.Delete(key)
-			mk := MetricKey{
-				ClientID: int(key.ClientId),
-				DestIP:   key.DestIp,
-				DestPort: key.DestPort,
-			}
-			m := h.currMetrics[mk]
-			for _, v := range value {
-				m.BytesIn += v.InBytes
-				m.BytesOut += v.OutBytes
-			}
-			h.currMetrics[mk] = m
-		}
-		h.mu.Unlock()
-	}
-}
-
-type MetricKey struct {
-	ClientID int
-	DestIP   uint32
-	DestPort uint16
-}
-
-type Metric struct {
-	BytesIn  uint64
-	BytesOut uint64
-}
-
-func (h *Handle) Metrics() map[MetricKey]Metric {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	old := h.currMetrics
-	h.currMetrics = make(map[MetricKey]Metric)
-	return old
-}
-
 type ClientAccount struct {
-	ClientID     uint32
 	AccountID    uint32
 	BandwidthIn  uint64
 	BandwidthOut uint64
@@ -182,24 +123,22 @@ func (h *Handle) UpdateClientAccount(ca map[string]ClientAccount) error {
 
 	keys := make(map[uint32]struct{})
 	for k, v := range ca {
-		i := net.ParseIP(k).To4()
-		ii := binary.LittleEndian.Uint32(i)
+		i := binary.BigEndian.Uint32(net.ParseIP(k).To4())
 		val := bwfilterClientInfo{
-			ClientId:           v.ClientID,
 			AccountId:          v.AccountID,
 			ThrottleInRateBps:  uint32(v.BandwidthIn),
 			ThrottleOutRateBps: uint32(v.BandwidthOut),
 		}
-		keys[ii] = struct{}{}
-		if ca, ok := h.currClientAccount[ii]; ok {
+		keys[i] = struct{}{}
+		if ca, ok := h.currClientAccount[i]; ok {
 			if ca == val {
 				continue
 			}
 		}
-		if err := h.objs.ClientAccountMap.Update(&ii, &val, ebpf.UpdateAny); err != nil {
+		if err := h.objs.ClientAccountMap.Update(&i, &val, ebpf.UpdateAny); err != nil {
 			return err
 		}
-		h.currClientAccount[ii] = val
+		h.currClientAccount[i] = val
 	}
 
 	for k := range h.currClientAccount {

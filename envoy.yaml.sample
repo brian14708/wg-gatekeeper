@@ -30,9 +30,9 @@ static_resources:
           stat_prefix: tcp_proxy
           cluster: PassthroughCluster
           access_log:
-          - name: envoy.access_loggers.http_grpc
+          - name: envoy.access_loggers.tcp_grpc
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.grpc.v3.TcpGrpcAccessLogConfig
               common_config:
                 grpc_service:
                   envoy_grpc:
@@ -81,9 +81,9 @@ static_resources:
           stat_prefix: tcp_proxy
           cluster: PassthroughCluster
           access_log:
-          - name: envoy.access_loggers.http_grpc
+          - name: envoy.access_loggers.tcp_grpc
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.grpc.v3.TcpGrpcAccessLogConfig
               common_config:
                 grpc_service:
                   envoy_grpc:
