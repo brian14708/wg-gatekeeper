@@ -12,6 +12,7 @@ import (
 
 	"github.com/Masterminds/sprig/v3"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
 	"github.com/gofiber/template/html"
 	"google.golang.org/grpc"
@@ -65,8 +66,10 @@ func main() {
 		ViewsLayout: "layouts/main",
 	})
 
+	app.Use(compress.New())
 	app.Use("/assets", filesystem.New(filesystem.Config{
-		Root: http.FS(GetAssets()),
+		Root:   http.FS(GetAssets()),
+		MaxAge: int(time.Hour / time.Second),
 	}))
 
 	instanceKey := strconv.Itoa(rand.Int())
