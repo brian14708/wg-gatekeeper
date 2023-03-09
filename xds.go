@@ -18,6 +18,7 @@ import (
 	tls_inspectorv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/listener/tls_inspector/v3"
 	http_connection_managerv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
 	tcp_proxyv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/tcp_proxy/v3"
+	httpv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/upstreams/http/v3"
 	clusterservice "github.com/envoyproxy/go-control-plane/envoy/service/cluster/v3"
 	discoverygrpc "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	listenerservice "github.com/envoyproxy/go-control-plane/envoy/service/listener/v3"
@@ -97,7 +98,15 @@ func snapshot() (*cache.Snapshot, error) {
 							}},
 						}},
 					},
-					Http2ProtocolOptions: &corev3.Http2ProtocolOptions{},
+					TypedExtensionProtocolOptions: map[string]*anypb.Any{
+						"envoy.extensions.upstreams.http.v3.HttpProtocolOptions": mustMarshalAny(&httpv3.HttpProtocolOptions{
+							UpstreamProtocolOptions: &httpv3.HttpProtocolOptions_ExplicitHttpConfig_{
+								ExplicitHttpConfig: &httpv3.HttpProtocolOptions_ExplicitHttpConfig{
+									ProtocolConfig: &httpv3.HttpProtocolOptions_ExplicitHttpConfig_Http2ProtocolOptions{},
+								},
+							},
+						}),
+					},
 				},
 			},
 			resource.ListenerType: {
