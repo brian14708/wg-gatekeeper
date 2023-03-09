@@ -105,7 +105,7 @@ func (s *Syncer) Run() {
 			if err != nil {
 				panic(err)
 			}
-			err = i.NatAdd(iface.NatIface)
+			err = i.NatAdd(iface.NatIface, *flagEnovyTcp)
 			if err != nil {
 				panic(err)
 			}

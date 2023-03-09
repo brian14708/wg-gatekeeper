@@ -18,8 +18,9 @@ import (
 )
 
 var (
-	flagDBPath = flag.String("db", "db.sqlite", "path to database")
-	flagListen = flag.String("listen", ":3000", "address to listen on")
+	flagDBPath   = flag.String("db", "db.sqlite", "path to database")
+	flagListen   = flag.String("listen", ":3000", "address to listen on")
+	flagEnovyTcp = flag.Int("envoy-tcp-proxy", -1, "port for envoy tcp proxy")
 
 	syncer *Syncer
 )

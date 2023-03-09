@@ -1,0 +1,89 @@
+admin:
+  address:
+    socket_address: { address: 127.0.0.1, port_value: 9901 }
+
+static_resources:
+  listeners:
+  - name: virtual
+    address:
+      socket_address:
+        protocol: TCP
+        address: 0.0.0.0
+        port_value: 15001
+    listener_filters:
+    - name: "envoy.filters.listener.tls_inspector"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+    - name: envoy.filters.listener.http_inspector
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.http_inspector.v3.HttpInspector
+    - name: envoy.filters.listener.original_dst
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.original_dst.v3.OriginalDst
+    filter_chains:
+    - filter_chain_match:
+        transport_protocol: tls
+      filters:
+      - name: envoy.filters.network.tcp_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: tcp_proxy
+          cluster: PassthroughCluster
+          access_log:
+          - name: envoy.access_loggers.file
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+              log_format:
+                text_format: "TLS %REQ(:AUTHORITY)% %UPSTREAM_HOST% %REQUESTED_SERVER_NAME%\n"
+              path: /dev/stdout
+    - filter_chain_match:
+        application_protocols:
+          - http/1.0
+          - http/1.1
+      filters:
+      - name: envoy.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: http_proxy
+          http_filters:
+            - name: envoy.filters.http.router
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+          route_config:
+            name: local_service
+            virtual_hosts:
+              - name: backend
+                domains:
+                  - "*"
+                routes:
+                  - match:
+                      prefix: "/"
+                    route:
+                      cluster: PassthroughCluster
+          access_log:
+          - name: envoy.access_loggers.file
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+              log_format:
+                text_format: "HTTP %REQ(:AUTHORITY)% %UPSTREAM_HOST% %REQUESTED_SERVER_NAME%\n"
+              path: /dev/stdout
+    - filter_chain_match:
+      filters:
+      - name: envoy.filters.network.tcp_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: tcp_proxy
+          cluster: PassthroughCluster
+          access_log:
+          - name: envoy.access_loggers.file
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+              log_format:
+                text_format: "FALLBACK %REQ(:AUTHORITY)% %UPSTREAM_HOST% %REQUESTED_SERVER_NAME%\n"
+              path: /dev/stdout
+  clusters:
+  - name: PassthroughCluster
+    type: ORIGINAL_DST
+    connect_timeout: 10s
+    lb_policy: CLUSTER_PROVIDED
+    connectTimeout: 10s

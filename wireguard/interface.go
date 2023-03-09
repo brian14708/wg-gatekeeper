@@ -202,13 +202,16 @@ func (i *Interface) natDel(tbl *iptables.IPTables) error {
 	if err := clearChain(tbl, "nat", "POSTROUTING", comment); err != nil {
 		return err
 	}
+	if err := clearChain(tbl, "nat", "PREROUTING", comment); err != nil {
+		return err
+	}
 	if err := clearChain(tbl, "mangle", "PREROUTING", comment); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (i *Interface) NatAdd(iface string) error {
+func (i *Interface) NatAdd(iface string, envoy int) error {
 	if val, err := sysctl.Get("net.ipv4.ip_forward"); err != nil {
 		return err
 	} else if val != "1" {
@@ -243,6 +246,12 @@ func (i *Interface) NatAdd(iface string) error {
 	err = tbl.AppendUnique("mangle", "PREROUTING", "-i", i.name, "-j", "MARK", "--set-mark", mark, "-m", "comment", "--comment", comment)
 	if err != nil {
 		return err
+	}
+	if envoy > 0 {
+		err = tbl.AppendUnique("nat", "PREROUTING", "-i", i.name, "-p", "tcp", "-j", "REDIRECT", "--to-port", fmt.Sprintf("%d", envoy))
+		if err != nil {
+			return err
+		}
 	}
 	err = tbl.AppendUnique("nat", "POSTROUTING", "-o", iface, "-m", "mark", "--mark", mark, "-j", "MASQUERADE", "-m", "comment", "--comment", comment)
 	if err != nil {
