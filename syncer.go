@@ -68,7 +68,7 @@ func (s *Syncer) Run() {
 		case <-s.updateInterface:
 			// update interface
 			var iface models.Interface
-			models.DB.First(&iface)
+			models.DB.Last(&iface)
 			if iface.ID == 0 {
 				continue
 			}
@@ -117,13 +117,13 @@ func (s *Syncer) Run() {
 		case <-s.updateClients:
 			// update clients
 			var iface models.Interface
-			models.DB.First(&iface)
+			models.DB.Last(&iface)
 
 			rows, err := models.DB.Table("clients").
 				Select("clients.public_key, clients.ip_address, accounts.id, clients.id, accounts.bandwidth_in_limit, accounts.bandwidth_out_limit").
 				Joins("left join accounts on accounts.id = clients.account_id").
 				Joins("left join interfaces on interfaces.id = accounts.interface_id").
-				Where("interfaces.id = ?", iface.ID).
+				Where("interfaces.id = ? AND clients.deleted_at IS NULL AND accounts.deleted_at IS NULL", iface.ID).
 				Rows()
 			if err != nil {
 				panic(err)

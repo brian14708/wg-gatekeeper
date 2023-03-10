@@ -74,7 +74,7 @@ require (
 	golang.org/x/sync v0.1.0 // indirect
 	golang.org/x/text v0.8.0 // indirect
 	golang.org/x/tools v0.7.0 // indirect
-	golang.zx2c4.com/wireguard v0.0.0-20230304142546-b6a68cf211aa // indirect
+	golang.zx2c4.com/wireguard v0.0.0-20230309202816-787da6420c65 // indirect
 	google.golang.org/genproto v0.0.0-20230306155012-7f2fa6fef1f4 // indirect
 	honnef.co/go/tools v0.4.2 // indirect
 )

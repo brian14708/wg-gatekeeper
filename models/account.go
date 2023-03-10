@@ -10,5 +10,5 @@ type Account struct {
 	BandwidthOutLimit int64
 	InterfaceID       int
 
-	Clients []Client `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	Clients []Client
 }

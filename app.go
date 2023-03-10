@@ -23,6 +23,9 @@ import (
 func appHandler(app *fiber.App) {
 	// all accounts
 	app.Get("/", func(c *fiber.Ctx) error {
+		var iface models.Interface
+		models.DB.Last(&iface)
+
 		type Account struct {
 			ID      int
 			Name    string
@@ -31,8 +34,8 @@ func appHandler(app *fiber.App) {
 		var result []Account
 		rows, err := models.DB.Table("accounts").
 			Select("accounts.id, accounts.name, count(clients.id)").
-			Where("accounts.deleted_at is null").
 			Joins("left join clients on clients.account_id = accounts.id").
+			Where("accounts.deleted_at IS NULL AND clients.deleted_at IS NULL AND accounts.interface_id = ?", iface.ID).
 			Group("clients.account_id").
 			Rows()
 		if err != nil {
@@ -94,7 +97,7 @@ func appHandler(app *fiber.App) {
 	// create account
 	app.Post("/account", func(c *fiber.Ctx) error {
 		var iface models.Interface
-		models.DB.First(&iface)
+		models.DB.Last(&iface)
 
 		var acc models.Account
 		acc.Name = c.FormValue("name")
@@ -149,7 +152,7 @@ func appHandler(app *fiber.App) {
 
 	// delete account
 	app.Get("/account/:id/delete", func(c *fiber.Ctx) error {
-		ret := models.DB.Unscoped().Delete(&models.Account{}, c.Params("id"))
+		ret := models.DB.Delete(&models.Account{}, c.Params("id"))
 		if ret.Error != nil {
 			flashError(c, ret.Error.Error())
 		} else {
@@ -174,10 +177,10 @@ func appHandler(app *fiber.App) {
 		cli.PublicKey = pub[:]
 
 		iface := models.Interface{}
-		models.DB.First(&iface)
+		models.DB.Last(&iface)
 
 		var newestClient models.Client
-		models.DB.Last(&newestClient)
+		models.DB.Unscoped().Last(&newestClient)
 
 		{
 			ip, cidr, err := net.ParseCIDR(iface.Subnet)
@@ -235,7 +238,7 @@ func appHandler(app *fiber.App) {
 	// delete client
 	app.Get("/account/:id/client/:cid/delete", func(c *fiber.Ctx) error {
 		var cli models.Client
-		models.DB.Unscoped().Delete(&cli, c.Params("cid"))
+		models.DB.Delete(&cli, c.Params("cid"))
 		syncer.UpdateClients()
 		return c.Redirect("/account/" + c.Params("id"))
 	})
@@ -243,7 +246,7 @@ func appHandler(app *fiber.App) {
 	// get settings
 	app.Get("/interface", func(c *fiber.Ctx) error {
 		iface := models.Interface{}
-		models.DB.First(&iface)
+		models.DB.Last(&iface)
 
 		links, _ := netlink.LinkList()
 		var attrs []*netlink.LinkAttrs
@@ -264,7 +267,7 @@ func appHandler(app *fiber.App) {
 	// update settings
 	app.Post("/interface", func(c *fiber.Ctx) error {
 		iface := models.Interface{}
-		models.DB.First(&iface)
+		models.DB.Last(&iface)
 
 		iface.Name = c.FormValue("name")
 		if len(iface.PrivateKey) == 0 {
@@ -307,13 +310,19 @@ func appHandler(app *fiber.App) {
 
 	// delete interface
 	app.Get("/interface/:id/delete", func(c *fiber.Ctx) error {
-		ret := models.DB.Unscoped().Delete(&models.Interface{}, c.Params("id"))
+		ret := models.DB.Delete(&models.Interface{}, c.Params("id"))
 		if ret.Error != nil {
 			flashError(c, ret.Error.Error())
-		} else {
-			flashInfo(c, "Interface deleted")
+			return c.Redirect("/interface")
 		}
-		c.ClearCookie("iface")
+
+		flashInfo(c, "Interface deleted")
+		c.Cookie(&fiber.Cookie{
+			Name:        "iface",
+			Expires:     time.Now().Add(-time.Hour),
+			HTTPOnly:    true,
+			SessionOnly: true,
+		})
 		syncer.DeleteInterface()
 		return c.Redirect("/interface")
 	})

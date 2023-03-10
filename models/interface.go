@@ -15,5 +15,5 @@ type Interface struct {
 	ExternalIP string
 	DNS        string
 
-	Accounts []Account `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	Accounts []Account
 }

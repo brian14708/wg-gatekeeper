@@ -147,31 +147,22 @@ func (db *DB) Total(client []net.IP) (uint64, uint64, error) {
 	if len(client) == 0 {
 		return 0, 0, nil
 	}
-	stmt, err := db.Prepare(`
-	SELECT SUM(sent_bytes) as sent, SUM(received_bytes) as recv FROM log
-	WHERE local_addr IN ( ?` + strings.Repeat(",?", len(client)-1) + ` )
-	`)
-	if err != nil {
-		return 0, 0, err
-	}
-	defer stmt.Close()
-
 	var args []interface{}
 	for _, c := range client {
 		args = append(args, binary.BigEndian.Uint32(c))
 	}
-	rows, err := stmt.Query(args...)
+
+	row := db.QueryRow(`
+	SELECT IFNULL(SUM(sent_bytes), 0) as sent, IFNULL(SUM(received_bytes), 0) as recv FROM log
+	WHERE local_addr IN ( ?`+strings.Repeat(",?", len(client)-1)+` )
+	`,
+		args...,
+	)
+
+	var sent, recv uint64
+	err := row.Scan(&sent, &recv)
 	if err != nil {
 		return 0, 0, err
 	}
-	defer rows.Close()
-
-	var sent, recv uint64
-	for rows.Next() {
-		err = rows.Scan(&sent, &recv)
-		if err != nil {
-			return 0, 0, err
-		}
-	}
-	return sent, recv, rows.Err()
+	return sent, recv, row.Err()
 }
