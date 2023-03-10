@@ -11,6 +11,11 @@
     </tr>
     <tr>
         <th>Total</th>
+        <td>{{ round (divf .Account.BytesIn 1048576.0) 2 }}</td>
+        <td>{{ round (divf .Account.BytesOut 1048576.0) 2 }}</td>
+    </tr>
+    <tr>
+        <th>Total (TCP)</th>
         <td>{{ round (divf .TotalRecv 1048576.0) 2 }}</td>
         <td>{{ round (divf .TotalSent 1048576.0) 2 }}</td>
     </tr>

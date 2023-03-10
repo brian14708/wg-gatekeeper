@@ -47,6 +47,19 @@ struct {
   __uint(map_flags, BPF_F_NO_PREALLOC);
 } client_account_map SEC(".maps");
 
+struct account_metric {
+  uint32_t bytes_in;
+  uint32_t bytes_out;
+};
+
+struct {
+  __uint(type, BPF_MAP_TYPE_PERCPU_HASH);
+  __type(key, uint32_t); // account_id
+  __type(value, struct account_metric);
+  __uint(max_entries, 65536);
+  __uint(map_flags, BPF_F_NO_PREALLOC);
+} account_metric_map SEC(".maps");
+
 enum flags {
   FLAGS_OUT = 1,
 };
@@ -135,6 +148,30 @@ SEC("classifier") int tc_prog(struct __sk_buff *skb) {
                         cli->throttle_out_rate_bps / 8, skb);
   } else {
     act = throttle_flow(cli->account_id, cli->throttle_in_rate_bps / 8, skb);
+  }
+
+  if (act != TC_ACT_OK) {
+    return act;
+  }
+
+  struct account_metric *metric =
+      bpf_map_lookup_elem(&account_metric_map, &cli->account_id);
+  if (metric == NULL) {
+    struct account_metric value = {
+        .bytes_in = (flag & FLAGS_OUT) ? 0 : skb->wire_len,
+        .bytes_out = (flag & FLAGS_OUT) ? skb->wire_len : 0,
+    };
+
+    bpf_map_update_elem(&account_metric_map, &cli->account_id, &value, BPF_ANY);
+  } else {
+    struct account_metric value = {
+        .bytes_in = metric->bytes_in + ((flag & FLAGS_OUT) ? 0 : skb->wire_len),
+        .bytes_out =
+            metric->bytes_out + ((flag & FLAGS_OUT) ? skb->wire_len : 0),
+    };
+
+    bpf_map_update_elem(&account_metric_map, &cli->account_id, &value,
+                        BPF_EXIST);
   }
 
   return act;

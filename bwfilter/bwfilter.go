@@ -104,6 +104,22 @@ func (h *Handle) Close() error {
 	return h.objs.Close()
 }
 
+func (h *Handle) GetMetric(f func(accountID int, bytesIn, bytesOut int64)) {
+	m := h.objs.AccountMetricMap.Iterate()
+	var aid uint32
+	var values []bwfilterAccountMetric
+	for m.Next(&aid, &values) {
+		h.objs.AccountMetricMap.Delete(&aid)
+		var bytesIn int64 = 0
+		var bytesOut int64 = 0
+		for _, v := range values {
+			bytesIn += int64(v.BytesIn)
+			bytesOut += int64(v.BytesOut)
+		}
+		f(int(aid), bytesIn, bytesOut)
+	}
+}
+
 type ClientAccount struct {
 	AccountID    uint32
 	BandwidthIn  uint64

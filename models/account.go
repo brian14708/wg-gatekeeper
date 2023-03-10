@@ -10,5 +10,8 @@ type Account struct {
 	BandwidthOutLimit int64
 	InterfaceID       int
 
+	BytesIn  int64
+	BytesOut int64
+
 	Clients []Client
 }

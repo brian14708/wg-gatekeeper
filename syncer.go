@@ -57,14 +57,23 @@ func (s *Syncer) DeleteInterface() {
 }
 
 const (
-	AuditStep = time.Hour
+	MetricInterval = 30 * time.Second
 )
 
 func (s *Syncer) Run() {
 	var wg *wireguard.Interface
 	var handle *bwfilter.Handle
+	timer := time.NewTimer(MetricInterval)
 	for {
 		select {
+		case <-timer.C:
+			// update metrics
+			if handle != nil {
+				handle.GetMetric(func(accountID int, bytesIn, bytesOut int64) {
+					models.DB.Exec("UPDATE accounts SET bytes_in = bytes_in + ?, bytes_out = bytes_out + ? WHERE id = ?", bytesIn, bytesOut, accountID)
+				})
+			}
+			timer.Reset(MetricInterval)
 		case <-s.updateInterface:
 			// update interface
 			var iface models.Interface

@@ -13,6 +13,11 @@ import (
 	"github.com/cilium/ebpf"
 )
 
+type bwfilterAccountMetric struct {
+	BytesIn  uint32
+	BytesOut uint32
+}
+
 type bwfilterClientInfo struct {
 	AccountId          uint32
 	ThrottleInRateBps  uint32
@@ -67,6 +72,7 @@ type bwfilterProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type bwfilterMapSpecs struct {
+	AccountMetricMap *ebpf.MapSpec `ebpf:"account_metric_map"`
 	ClientAccountMap *ebpf.MapSpec `ebpf:"client_account_map"`
 	FlowMap          *ebpf.MapSpec `ebpf:"flow_map"`
 }
@@ -90,12 +96,14 @@ func (o *bwfilterObjects) Close() error {
 //
 // It can be passed to loadBwfilterObjects or ebpf.CollectionSpec.LoadAndAssign.
 type bwfilterMaps struct {
+	AccountMetricMap *ebpf.Map `ebpf:"account_metric_map"`
 	ClientAccountMap *ebpf.Map `ebpf:"client_account_map"`
 	FlowMap          *ebpf.Map `ebpf:"flow_map"`
 }
 
 func (m *bwfilterMaps) Close() error {
 	return _BwfilterClose(
+		m.AccountMetricMap,
 		m.ClientAccountMap,
 		m.FlowMap,
 	)
