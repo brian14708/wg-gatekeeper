@@ -18,7 +18,7 @@ var (
 )
 
 func startLog(srv *grpc.Server) {
-	d, err := auditlog.New()
+	d, err := auditlog.New("audit.db")
 	if err != nil {
 		log.Fatalf("failed to open auditlog: %v", err)
 	}
